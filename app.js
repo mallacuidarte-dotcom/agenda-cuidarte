@@ -167,6 +167,42 @@
   }
 
   /**
+   * Normaliza una hora a formato "3:30 p. m.". Acepta:
+   * - "3:30:00 p.m." → "3:30 p. m."
+   * - "15:30"        → "3:30 p. m."
+   * - "15:30:00"     → "3:30 p. m."
+   * - "9:00 AM"      → "9:00 a. m."
+   * Devuelve string vacío si no se puede interpretar.
+   */
+  function limpiarHora(texto) {
+    if (!texto || typeof texto !== 'string') return '';
+    let t = texto.trim();
+    if (!t) return '';
+
+    // Formato 12h: "3:30 p.m." / "3:30:00 p. m." / "9:00 AM" / etc.
+    let m = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([ap])\.?\s*\.?\s*m?\.?/i);
+    if (m) {
+      const h = parseInt(m[1]);
+      const ampm = m[3].toLowerCase() === 'p' ? 'p. m.' : 'a. m.';
+      return h + ':' + m[2] + ' ' + ampm;
+    }
+
+    // Formato 24h: "14:30" / "14:30:00" / "09:00"
+    m = t.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (m) {
+      const h = parseInt(m[1]);
+      const min = m[2];
+      if (h === 0)  return '12:' + min + ' a. m.';
+      if (h < 12)   return h + ':' + min + ' a. m.';
+      if (h === 12) return '12:' + min + ' p. m.';
+      return (h - 12) + ':' + min + ' p. m.';
+    }
+
+    // Si no matchea nada, devolver tal cual (no se rompe, solo se ve raro)
+    return t;
+  }
+
+  /**
    * Formatea un timestamp relativo: "hace 3 minutos", "hace 2 horas".
    */
   function tiempoRelativo(timestamp) {
@@ -338,13 +374,13 @@
         fechaKey: fechaKey(fecha),
         territorio: territorio,
         actividad: actividad,
-        horaInicio: String(obtenerCampo(fila, [
+        horaInicio: limpiarHora(obtenerCampo(fila, [
           'Hora de inicio', 'Hora inicio', 'hora de inicio', 'hora inicio'
-        ]) || '').trim(),
-        horaFin: String(obtenerCampo(fila, [
+        ])),
+        horaFin: limpiarHora(obtenerCampo(fila, [
           'Hora de finalización', 'Hora de finalizacion', 'Hora fin',
           'hora de finalización', 'hora fin'
-        ]) || '').trim(),
+        ])),
         lugar: String(obtenerCampo(fila, ['Lugar', 'lugar']) || '').trim(),
         responsable: String(obtenerCampo(fila, [
           'Responsable (entidad)', 'Responsable entidad', 'Responsable', 'responsable'
@@ -353,13 +389,13 @@
         espejoActividad: String(obtenerCampo(fila, [
           'Actividad espejo', 'actividad espejo'
         ]) || '').trim(),
-        espejoHoraInicio: String(obtenerCampo(fila, [
+        espejoHoraInicio: limpiarHora(obtenerCampo(fila, [
           'Hora de inicio espejo', 'Hora inicio espejo', 'hora de inicio espejo'
-        ]) || '').trim(),
-        espejoHoraFin: String(obtenerCampo(fila, [
+        ])),
+        espejoHoraFin: limpiarHora(obtenerCampo(fila, [
           'Hora de finalización espejo', 'Hora de finalizacion espejo',
           'Hora fin espejo', 'hora de finalización espejo'
-        ]) || '').trim(),
+        ])),
         espejoLugar: String(obtenerCampo(fila, ['Lugar espejo', 'lugar espejo']) || '').trim(),
         espejoResponsable: String(obtenerCampo(fila, [
           'Responsable (entidad) espejo', 'Responsable entidad espejo',
@@ -822,9 +858,35 @@
         : 'Mostrando todos los territorios');
     });
 
-    // Filtro: búsqueda (debounced para no saturar)
+    // Toggle del buscador: la lupa lo abre, limpiar lo cierra
+    const $toggleBusqueda = document.getElementById('btn-toggle-busqueda');
+    const $wrapperBusqueda = document.getElementById('filtro-busqueda-wrapper');
     const $busqueda = document.getElementById('filtro-busqueda');
     const $limpiar = document.getElementById('btn-limpiar-busqueda');
+
+    $toggleBusqueda.addEventListener('click', () => {
+      const abierto = !$wrapperBusqueda.hidden;
+      if (abierto) {
+        // Cerrar y limpiar cualquier búsqueda activa
+        $wrapperBusqueda.hidden = true;
+        $toggleBusqueda.setAttribute('aria-expanded', 'false');
+        $toggleBusqueda.setAttribute('aria-label', 'Abrir buscador de actividades');
+        if (state.filtroBusqueda) {
+          state.filtroBusqueda = '';
+          $busqueda.value = '';
+          $limpiar.hidden = true;
+          render();
+        }
+      } else {
+        $wrapperBusqueda.hidden = false;
+        $toggleBusqueda.setAttribute('aria-expanded', 'true');
+        $toggleBusqueda.setAttribute('aria-label', 'Cerrar buscador');
+        // Foco automático al abrir (mejor UX)
+        setTimeout(() => $busqueda.focus(), 50);
+      }
+    });
+
+    // Filtro: búsqueda (debounced para no saturar)
     let timeoutBusqueda;
     $busqueda.addEventListener('input', (e) => {
       const valor = e.target.value;
@@ -838,9 +900,13 @@
 
     $limpiar.addEventListener('click', () => {
       $busqueda.value = '';
-      $busqueda.focus();
       state.filtroBusqueda = '';
       $limpiar.hidden = true;
+      // Cerrar también el buscador al limpiar
+      $wrapperBusqueda.hidden = true;
+      $toggleBusqueda.setAttribute('aria-expanded', 'false');
+      $toggleBusqueda.setAttribute('aria-label', 'Abrir buscador de actividades');
+      $toggleBusqueda.focus();
       render();
     });
 

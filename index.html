@@ -74,37 +74,45 @@
   </header>
 
   <!-- ============================================================ -->
-  <!-- BARRA DE FILTROS: comuna, búsqueda, vista                     -->
+  <!-- BARRA DE FILTROS: minimalista, el buscar se expande al tocar -->
   <!-- ============================================================ -->
   <section class="filtros-wrapper" aria-label="Filtros de búsqueda">
     <div class="filtros-inner">
 
-      <!-- Filtro: Territorio -->
-      <div class="filtro-grupo">
-        <label for="filtro-comuna" class="filtro-label">
-          Territorio
-        </label>
+      <!-- Fila principal compacta: select de territorio + botón lupa -->
+      <div class="filtros-barra">
+
+        <!-- Filtro: Territorio -->
         <div class="select-wrapper">
+          <label for="filtro-comuna" class="sr-only">Territorio</label>
           <select id="filtro-comuna"
                   class="filtro-select"
-                  aria-describedby="filtro-comuna-ayuda">
+                  aria-label="Filtrar por territorio">
             <option value="">Todos los territorios</option>
-            <!-- Las opciones de territorio se insertan desde JS para que sean dinámicas -->
+            <!-- Las opciones de territorio se insertan desde JS -->
           </select>
           <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
         </div>
-        <p id="filtro-comuna-ayuda" class="filtro-ayuda sr-only">
-          Elige un territorio para ver solo sus actividades
-        </p>
+
+        <!-- Botón de lupa: al tocarlo, abre el buscador -->
+        <button id="btn-toggle-busqueda"
+                type="button"
+                class="btn-icono"
+                aria-expanded="false"
+                aria-controls="filtro-busqueda-wrapper"
+                aria-label="Abrir buscador de actividades">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
       </div>
 
-      <!-- Filtro: Búsqueda por texto -->
-      <div class="filtro-grupo filtro-busqueda-grupo">
-        <label for="filtro-busqueda" class="filtro-label">
-          Buscar actividad
-        </label>
+      <!-- Buscador expandible: inicialmente oculto -->
+      <div id="filtro-busqueda-wrapper" class="filtro-busqueda-wrapper" hidden>
+        <label for="filtro-busqueda" class="sr-only">Buscar actividad</label>
         <div class="input-wrapper">
           <svg class="input-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
             <circle cx="11" cy="11" r="8"></circle>
@@ -114,12 +122,11 @@
                  type="search"
                  class="filtro-input"
                  placeholder="Nombre, lugar o entidad"
-                 autocomplete="off"
-                 aria-describedby="filtro-busqueda-ayuda">
+                 autocomplete="off">
           <button id="btn-limpiar-busqueda"
                   type="button"
                   class="input-limpiar"
-                  aria-label="Limpiar búsqueda"
+                  aria-label="Limpiar y cerrar buscador"
                   hidden>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
               <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -127,9 +134,6 @@
             </svg>
           </button>
         </div>
-        <p id="filtro-busqueda-ayuda" class="filtro-ayuda sr-only">
-          Escribe palabras clave de la actividad, el lugar o la entidad
-        </p>
       </div>
 
     </div>

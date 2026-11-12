@@ -332,17 +332,11 @@ a:focus-visible {
   font-weight: var(--font-regular);
 }
 
-/* Título principal */
+/* Título principal (fondo blanco heredado del .app-header; sin cuadro violeta) */
 .header-titulo {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: var(--space-4) var(--space-4) var(--space-6);
-  background: linear-gradient(135deg, var(--violeta-900) 0%, var(--violeta-700) 100%);
-}
-
-.app-header .header-titulo {
-  background: transparent;
-  padding-top: 0;
+  padding: 0 var(--space-4) var(--space-4);
 }
 
 .app-titulo {
@@ -375,22 +369,48 @@ a:focus-visible {
 .filtros-inner {
   max-width: var(--max-width);
   margin: 0 auto;
-  padding: var(--space-4);
-  display: grid;
-  gap: var(--space-4);
-  grid-template-columns: 1fr;
-}
-
-.filtro-grupo {
+  padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Barra compacta de una sola fila: select + lupa */
+.filtros-barra {
+  display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
-.filtro-label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
+/* Botón-icono (lupa). Cuadrado, 48×48 para touch */
+.btn-icono {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--blanco);
   color: var(--violeta-900);
+  border: 2px solid var(--gris-200);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-icono:hover {
+  background: var(--violeta-50);
+  border-color: var(--violeta-200);
+}
+
+.btn-icono svg {
+  width: 20px;
+  height: 20px;
+}
+
+.btn-icono[aria-expanded="true"] {
+  background: var(--violeta-900);
+  color: var(--blanco);
+  border-color: var(--violeta-900);
 }
 
 /* Select con chevron personalizado */
@@ -398,6 +418,8 @@ a:focus-visible {
   position: relative;
   display: flex;
   align-items: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .filtro-select {
@@ -431,6 +453,16 @@ a:focus-visible {
   height: 20px;
   color: var(--gris-700);
   pointer-events: none;
+}
+
+/* Wrapper del buscador expandible: desliza suavemente al abrirse */
+.filtro-busqueda-wrapper {
+  animation: deslizarAbajo 200ms ease;
+}
+
+@keyframes deslizarAbajo {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Input de búsqueda */
@@ -816,15 +848,21 @@ a:focus-visible {
 
 .grupo-territorio-contacto {
   font-size: var(--text-sm);
-  color: var(--violeta-200);
-  padding: var(--space-2) var(--space-5);
-  background: rgba(50, 42, 60, 0.08);
-  border-bottom: 1px solid var(--gris-200);
+  color: var(--blanco);
+  padding: var(--space-3) var(--space-5);
+  background: var(--rosa-cuidarte);
+  font-weight: var(--font-medium);
 }
 
 .grupo-territorio-contacto a {
-  color: inherit;
-  font-weight: var(--font-medium);
+  color: var(--blanco);
+  font-weight: var(--font-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.grupo-territorio-contacto a:hover {
+  text-decoration-thickness: 2px;
 }
 
 .actividades-grupo {
@@ -1068,15 +1106,48 @@ a:focus-visible {
 }
 
 /* ============================================================
-   12. RESPONSIVE: tablet y escritorio
+   12. RESPONSIVE
    ============================================================ */
 
-@media (min-width: 640px) {
-  .filtros-inner {
-    grid-template-columns: minmax(200px, 300px) 1fr;
-    align-items: end;
+/* MOBILE (< 640px): logos distribuidos izq/der, botón actualizar debajo */
+@media (max-width: 639px) {
+  .header-inner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
   }
 
+  /* Fila de logos: Cuidarte a la izquierda, Alcaldía a la derecha */
+  .header-logos {
+    width: 100%;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+
+  /* Ocultar el divider en mobile — los logos ya están separados por el espacio */
+  .logo-divider {
+    display: none;
+  }
+
+  /* Botón de actualizar centrado ocupando ancho razonable */
+  .header-actions {
+    display: flex;
+    justify-content: center;
+  }
+
+  .btn-actualizar {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Un poco más chico para que los dos logos quepan cómodos */
+  .logo-cuidarte { height: 22px; }
+  .logo-alcaldia { height: 26px; }
+}
+
+/* TABLET y DESKTOP (≥ 640px) */
+@media (min-width: 640px) {
   .app-titulo {
     font-size: var(--text-3xl);
   }
