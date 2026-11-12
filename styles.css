@@ -645,7 +645,7 @@ a:focus-visible {
 .vista-fecha {
   font-size: var(--text-base);
   color: var(--gris-700);
-  text-transform: capitalize;
+  /*text-transform: capitalize;*/
 }
 
 /* ============================================================
