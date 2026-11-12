@@ -645,7 +645,11 @@ a:focus-visible {
 .vista-fecha {
   font-size: var(--text-base);
   color: var(--gris-700);
-  /*text-transform: capitalize;*/
+}
+
+/* Solo capitalizar la primera letra, no cada palabra */
+.vista-fecha::first-letter {
+  text-transform: uppercase;
 }
 
 /* ============================================================
