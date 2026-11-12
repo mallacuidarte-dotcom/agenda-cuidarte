@@ -165,11 +165,8 @@
         <button class="vista-tab"
                 role="tab"
                 aria-selected="false"
-                data-vista="semana"
-                disabled
-                title="Disponible en la próxima versión">
+                data-vista="semana">
           Esta semana
-          <span class="vista-tab-badge">Pronto</span>
         </button>
       </li>
       <li role="none">
@@ -202,12 +199,64 @@
   <!-- ============================================================ -->
   <main id="contenido-principal" class="contenido" role="main" tabindex="-1">
 
-    <!-- Contexto temporal: fecha de hoy en grande, para dar orientación -->
-    <div class="vista-encabezado">
+    <!-- Encabezado de la vista HOY: título + fecha -->
+    <div id="encabezado-hoy" class="vista-encabezado">
       <h2 id="vista-titulo" class="vista-titulo">Hoy</h2>
       <p id="vista-fecha" class="vista-fecha">
         <!-- JS llena con "jueves 12 de noviembre" -->
       </p>
+    </div>
+
+    <!-- Encabezado de la vista SEMANA: nav con anterior/siguiente + rango + volver a hoy -->
+    <div id="encabezado-semana" class="semana-nav" hidden>
+      <div class="semana-nav-controles">
+        <button id="btn-semana-anterior"
+                type="button"
+                class="btn-icono btn-icono--nav"
+                aria-label="Semana anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+
+        <div class="semana-nav-titulo-wrap">
+          <h2 id="semana-titulo" class="semana-nav-titulo">
+            <!-- JS llena con "16 al 22 de noviembre" -->
+          </h2>
+          <button id="btn-volver-hoy"
+                  type="button"
+                  class="btn-mini"
+                  hidden>
+            ← Volver a esta semana
+          </button>
+        </div>
+
+        <button id="btn-semana-siguiente"
+                type="button"
+                class="btn-icono btn-icono--nav"
+                aria-label="Semana siguiente">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Chip discreto de guía: sugiere filtrar por territorio en vista semana -->
+    <div id="guia-filtro" class="guia-chip" hidden>
+      <span class="guia-chip-texto">
+        <span aria-hidden="true">💡</span>
+        Para ver solo tus actividades, filtra por territorio arriba
+      </span>
+      <button id="btn-cerrar-guia"
+              type="button"
+              class="guia-chip-cerrar"
+              aria-label="Cerrar esta sugerencia">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
     </div>
 
     <!-- ESTADO: Cargando por primera vez -->

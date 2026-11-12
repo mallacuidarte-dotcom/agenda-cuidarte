@@ -666,6 +666,234 @@ a:focus-visible {
   margin-bottom: var(--space-6);
 }
 
+/* ============================================================
+   NAVEGACIÓN DE SEMANA (vista semanal)
+   ============================================================ */
+
+.semana-nav {
+  margin-bottom: var(--space-5);
+  background: var(--blanco);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-3) var(--space-4);
+}
+
+.semana-nav-controles {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.semana-nav-titulo-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  text-align: center;
+}
+
+.semana-nav-titulo {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--violeta-900);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+
+.btn-icono--nav {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+/* Botón mini "Volver a esta semana" — solo aparece al navegar */
+.btn-mini {
+  font-size: var(--text-xs);
+  color: var(--violeta-900);
+  background: var(--violeta-50);
+  border: 1px solid var(--violeta-200);
+  border-radius: var(--radius-full);
+  padding: 4px var(--space-3);
+  font-weight: var(--font-medium);
+  min-height: 28px;
+  transition: background-color var(--transition-fast);
+}
+
+.btn-mini:hover {
+  background: var(--violeta-200);
+}
+
+/* ============================================================
+   CHIP DE GUÍA (discreto, no popup)
+   ============================================================ */
+
+.guia-chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-4);
+  background: var(--ambar-100);
+  border: 1px solid rgba(99, 56, 6, 0.15);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--ambar-700);
+  animation: deslizarAbajo 300ms ease;
+}
+
+.guia-chip-texto {
+  flex: 1;
+  line-height: var(--leading-normal);
+}
+
+.guia-chip-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--ambar-700);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+  transition: background-color var(--transition-fast);
+}
+
+.guia-chip-cerrar:hover {
+  background: rgba(99, 56, 6, 0.12);
+}
+
+.guia-chip-cerrar svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ============================================================
+   DÍAS DE LA VISTA SEMANAL
+   ============================================================ */
+
+.dias-semana {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.dia-semana {
+  background: var(--blanco);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  transition: opacity var(--transition-base);
+}
+
+/* Día pasado: todo en gris claro para dar contexto sin confundir */
+.dia-semana--pasado {
+  opacity: 0.6;
+}
+
+.dia-semana--pasado .dia-semana-header {
+  background: var(--gris-100);
+  color: var(--gris-700);
+  border-bottom: 1px solid var(--gris-200);
+}
+
+/* Día de HOY: resaltado con borde violeta */
+.dia-semana--hoy {
+  box-shadow: 0 0 0 2px var(--violeta-900), var(--shadow-md);
+}
+
+.dia-semana--hoy .dia-semana-header {
+  background: linear-gradient(135deg, var(--violeta-900) 0%, var(--violeta-700) 100%);
+  color: var(--blanco);
+}
+
+.dia-semana-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: var(--violeta-50);
+  color: var(--violeta-900);
+}
+
+.dia-semana-nombre {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.dia-semana-nombre-dia {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  text-transform: capitalize;
+}
+
+.dia-semana-nombre-fecha {
+  font-size: var(--text-sm);
+  opacity: 0.85;
+}
+
+.dia-semana-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dia-semana-badge--hoy {
+  background: var(--coral-cuidarte);
+  color: var(--blanco);
+}
+
+.dia-semana-badge--pasado {
+  background: var(--gris-500);
+  color: var(--blanco);
+}
+
+.dia-semana-contador {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  opacity: 0.9;
+}
+
+.dia-semana-vacio {
+  padding: var(--space-5);
+  text-align: center;
+  color: var(--gris-500);
+  font-size: var(--text-sm);
+  font-style: italic;
+}
+
+.dia-semana-actividades {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Chip de territorio dentro de tarjeta de vista semanal */
+.actividad-chip-territorio {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-2);
+  background: var(--violeta-50);
+  color: var(--violeta-900);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  margin-bottom: var(--space-2);
+}
+
+
 .vista-titulo {
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
@@ -1162,6 +1390,14 @@ a:focus-visible {
 
   .actividad {
     padding: var(--space-5);
+  }
+
+  .semana-nav-titulo {
+    font-size: var(--text-lg);
+  }
+
+  .dia-semana-nombre-dia {
+    font-size: var(--text-xl);
   }
 }
 

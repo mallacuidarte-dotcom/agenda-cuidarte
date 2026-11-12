@@ -71,14 +71,18 @@
   // ============================================================
 
   const state = {
-    actividades: [],        // Todas las actividades parseadas (solo desde hoy en adelante)
+    actividades: [],        // Todas las actividades parseadas (incluye pasadas para vista semanal)
     filtroComuna: '',       // Territorio seleccionado ('' = todos)
     filtroBusqueda: '',     // Texto de búsqueda
-    vistaActiva: 'hoy',     // 'hoy' (otras vistas son fase 2)
+    vistaActiva: 'hoy',     // 'hoy' | 'semana'
+    semanaOffset: 0,        // 0 = esta semana, -1 = anterior, 1 = siguiente, etc.
     cargando: false,
     error: null,
     ultimaActualizacion: null
   };
+
+  // Clave de localStorage para recordar si el usuario cerró la guía de filtro
+  const GUIA_CERRADA_KEY = 'agenda-cuidarte:guia-filtro-cerrada';
 
   // ============================================================
   // 3. HELPERS DE FECHAS Y FORMATO
@@ -144,6 +148,42 @@
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
+  }
+
+  /**
+   * Devuelve la semana lunes-domingo correspondiente a hoy + offset semanas.
+   *
+   * @param {number} offset - 0 = esta semana, -1 = anterior, 1 = siguiente.
+   * @return {{inicio: Date, fin: Date, dias: Date[]}}
+   */
+  function obtenerSemana(offset) {
+    offset = offset || 0;
+    const base = new Date();
+    base.setHours(12, 0, 0, 0);
+    base.setDate(base.getDate() + (offset * 7));
+
+    // dow: 0=domingo, 1=lunes, ..., 6=sábado
+    // Para una semana lunes-domingo, calcular cuántos días hay que retroceder.
+    const dow = base.getDay();
+    const diasAlLunes = dow === 0 ? -6 : 1 - dow;
+
+    const inicio = new Date(base);
+    inicio.setDate(base.getDate() + diasAlLunes);
+    inicio.setHours(0, 0, 0, 0);
+
+    const fin = new Date(inicio);
+    fin.setDate(inicio.getDate() + 6);
+    fin.setHours(23, 59, 59, 999);
+
+    const dias = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(inicio);
+      d.setDate(inicio.getDate() + i);
+      d.setHours(12, 0, 0, 0);
+      dias.push(d);
+    }
+
+    return { inicio, fin, dias };
   }
 
   /**
@@ -385,12 +425,9 @@
    * y las que ya pasaron. Devuelve array de actividades normalizadas.
    */
   function procesarFilas(filas) {
-    const hoyDate = hoy();
     const resultado = [];
 
     for (const fila of filas) {
-      // Los nombres de las columnas vienen del header del Sheets.
-      // Se mantienen tolerantes por si cambia la mayúscula o un espacio.
       // Lectura TOLERANTE: aceptamos varios nombres por columna para que no se
       // rompa si articulación cambia los encabezados del Sheets. Los primeros
       // valores son los que están en Sheets AHORA (noviembre 2026).
@@ -400,9 +437,10 @@
       ]));
       const actividad = String(obtenerCampo(fila, ['Actividad', 'actividad']) || '').trim();
 
-      // Skip si falta algo esencial o la fecha ya pasó
+      // Skip si falta algo esencial. Las fechas pasadas NO se descartan aquí
+      // porque la vista semanal permite navegar hacia atrás por decisión del usuario.
+      // La vista "Hoy" las filtra por su cuenta en filtrarActividades().
       if (!fecha || !territorio || !actividad) continue;
-      if (fecha < hoyDate) continue;
 
       resultado.push({
         fecha: fecha,
@@ -482,6 +520,12 @@
       resultado = resultado.filter(a => a.fechaKey === hoyKey);
     }
 
+    // Vista "Semana": actividades en el rango de la semana (con offset)
+    if (state.vistaActiva === 'semana') {
+      const semana = obtenerSemana(state.semanaOffset);
+      resultado = resultado.filter(a => a.fecha >= semana.inicio && a.fecha <= semana.fin);
+    }
+
     // Filtro: territorio
     if (state.filtroComuna) {
       resultado = resultado.filter(a => a.territorio === state.filtroComuna);
@@ -534,10 +578,10 @@
   function render() {
     actualizarTimestamp();
     renderOpcionesTerritorios();
-    renderFechaActual();
+    renderEncabezadoVista();
     renderChipsFiltros();
+    renderGuiaFiltro();
 
-    // Decidir qué estado mostrar
     const $cargando = document.getElementById('estado-cargando');
     const $error = document.getElementById('estado-error');
     const $vacio = document.getElementById('estado-vacio');
@@ -564,6 +608,19 @@
 
     const filtradas = filtrarActividades();
 
+    // En vista SEMANA siempre mostramos los 7 días (aunque vacíos), no el
+    // estado de "sin resultados". El usuario eligió esa semana.
+    if (state.vistaActiva === 'semana') {
+      $lista.hidden = false;
+      $lista.innerHTML = renderVistaSemana(filtradas);
+      $resultados.hidden = false;
+      document.getElementById('resultados-cantidad').textContent =
+        filtradas.length + (filtradas.length === 1 ? ' actividad en esta semana' : ' actividades en esta semana') +
+        (state.filtroComuna || state.filtroBusqueda ? ' con los filtros aplicados' : '');
+      return;
+    }
+
+    // Vista HOY: si no hay nada, estado vacío con mensaje contextual
     if (filtradas.length === 0) {
       $vacio.hidden = false;
       document.getElementById('estado-vacio-mensaje').textContent = mensajeVacio();
@@ -578,6 +635,148 @@
     document.getElementById('resultados-cantidad').textContent =
       filtradas.length + (filtradas.length === 1 ? ' actividad' : ' actividades') +
       (state.filtroComuna || state.filtroBusqueda ? ' con los filtros aplicados' : '');
+  }
+
+  /**
+   * Muestra el encabezado correcto según la vista activa y actualiza su contenido.
+   */
+  function renderEncabezadoVista() {
+    const $hoy = document.getElementById('encabezado-hoy');
+    const $semana = document.getElementById('encabezado-semana');
+
+    if (state.vistaActiva === 'semana') {
+      $hoy.hidden = true;
+      $semana.hidden = false;
+      renderNavSemana();
+    } else {
+      $hoy.hidden = false;
+      $semana.hidden = true;
+      renderFechaActual();
+    }
+  }
+
+  /**
+   * Pinta la nav de semana: rango de fechas + botón "Volver a esta semana" si offset != 0.
+   */
+  function renderNavSemana() {
+    const semana = obtenerSemana(state.semanaOffset);
+    const $titulo = document.getElementById('semana-titulo');
+    const $btnVolver = document.getElementById('btn-volver-hoy');
+
+    const tz = TZ;
+    const inicioDia = semana.inicio.getDate();
+    const finDia = semana.fin.getDate();
+    const inicioMes = mesEs_(semana.inicio, tz);
+    const finMes = mesEs_(semana.fin, tz);
+    const anio = semana.fin.getFullYear();
+
+    // Si la semana cruza dos meses, mostrarlos ambos
+    let titulo;
+    if (inicioMes === finMes) {
+      titulo = inicioDia + ' al ' + finDia + ' de ' + finMes + ' de ' + anio;
+    } else {
+      titulo = inicioDia + ' de ' + inicioMes + ' al ' + finDia + ' de ' + finMes + ' de ' + anio;
+    }
+
+    $titulo.textContent = cap_(titulo);
+    $btnVolver.hidden = (state.semanaOffset === 0);
+  }
+
+  /**
+   * Chip discreto de guía. Visible solo si:
+   * - La vista es semana
+   * - No hay filtro de territorio activo
+   * - El usuario no lo cerró antes (localStorage)
+   */
+  function renderGuiaFiltro() {
+    const $chip = document.getElementById('guia-filtro');
+    let cerrada = false;
+    try {
+      cerrada = localStorage.getItem(GUIA_CERRADA_KEY) === 'true';
+    } catch (e) {
+      // En modo incógnito algunos navegadores lanzan excepción; ignorar.
+    }
+    const mostrar = (state.vistaActiva === 'semana') && !state.filtroComuna && !cerrada;
+    $chip.hidden = !mostrar;
+  }
+
+  /**
+   * Renderiza la vista semanal: 7 secciones (una por día) con sus actividades.
+   * Días sin actividades: header + mensaje "Sin actividades programadas".
+   * Día de hoy: resaltado. Días pasados: grises con badge "Ya pasó".
+   */
+  function renderVistaSemana(filtradas) {
+    const semana = obtenerSemana(state.semanaOffset);
+    const hoyKey = fechaKey(hoy());
+    const hoyDate = hoy();
+    const tz = TZ;
+
+    return '<div class="dias-semana">' + semana.dias.map(dia => {
+      const diaKey = fechaKey(dia);
+      const esHoy = diaKey === hoyKey;
+      const esPasado = dia < hoyDate && !esHoy;
+
+      const actsDia = filtradas.filter(a => a.fechaKey === diaKey);
+
+      let clase = 'dia-semana';
+      if (esHoy)    clase += ' dia-semana--hoy';
+      if (esPasado) clase += ' dia-semana--pasado';
+
+      const nombreDia = diaEs_(dia, false);
+      const numero = dia.getDate();
+      const mes = mesEs_(dia, tz);
+
+      let badge = '';
+      if (esHoy)    badge = '<span class="dia-semana-badge dia-semana-badge--hoy">HOY</span>';
+      if (esPasado) badge = '<span class="dia-semana-badge dia-semana-badge--pasado">Ya pasó</span>';
+
+      const header =
+        '<header class="dia-semana-header">' +
+          '<div class="dia-semana-nombre">' +
+            '<span class="dia-semana-nombre-dia">' + escapar(nombreDia) + '</span>' +
+            '<span class="dia-semana-nombre-fecha">' + numero + ' de ' + escapar(mes) + '</span>' +
+            badge +
+          '</div>' +
+          '<span class="dia-semana-contador">' +
+            (actsDia.length === 0 ? 'Sin actividades' :
+             actsDia.length === 1 ? '1 actividad' :
+             actsDia.length + ' actividades') +
+          '</span>' +
+        '</header>';
+
+      let contenido;
+      if (actsDia.length === 0) {
+        contenido = '<p class="dia-semana-vacio">Sin actividades programadas para este día</p>';
+      } else {
+        // Las actividades ya vienen ordenadas por hora desde procesarFilas.
+        // Dentro del día, las muestro directamente (no reagrupo por territorio);
+        // cada tarjeta lleva un chip con el territorio.
+        contenido = '<div class="dia-semana-actividades">' +
+          actsDia.map(a => renderTarjetaConChip(a)).join('') +
+        '</div>';
+      }
+
+      return '<section class="' + clase + '">' + header + contenido + '</section>';
+    }).join('') + '</div>';
+  }
+
+  /**
+   * Renderiza una tarjeta igual a la de vista "Hoy" pero con un chip de
+   * territorio arriba. Útil en vista semanal donde las actividades no están
+   * agrupadas por territorio, así que necesitan la etiqueta.
+   */
+  function renderTarjetaConChip(a) {
+    // Reusar renderTarjeta y meter el chip al principio con una pequeña modificación:
+    // inyectamos el chip después de la apertura del <article>.
+    const base = renderTarjeta(a);
+    const chip = '<span class="actividad-chip-territorio">' +
+      '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">' +
+        '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>' +
+        '<circle cx="12" cy="10" r="3"></circle>' +
+      '</svg>' +
+      escapar(a.territorio) +
+    '</span>';
+    return base.replace(/^(<article class="actividad[^"]*">)/, '$1' + chip);
   }
 
   /**
@@ -947,18 +1146,50 @@
       render();
     });
 
-    // Tabs de vista (Fase 1: solo "hoy" funciona)
+    // Tabs de vista
     document.querySelectorAll('.vista-tab').forEach(tab => {
       tab.addEventListener('click', () => {
         if (tab.disabled) return;
         const vista = tab.dataset.vista;
         state.vistaActiva = vista;
+        // Al cambiar de vista, resetear offset de semana (más predecible)
+        if (vista === 'semana') state.semanaOffset = 0;
         document.querySelectorAll('.vista-tab').forEach(t => {
           t.classList.toggle('vista-tab--activa', t === tab);
           t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
         });
+        anunciar('Vista: ' + tab.textContent.trim());
         render();
       });
+    });
+
+    // Navegación de semana: anterior, siguiente, volver a hoy
+    document.getElementById('btn-semana-anterior').addEventListener('click', () => {
+      state.semanaOffset -= 1;
+      render();
+      anunciar('Semana anterior');
+    });
+
+    document.getElementById('btn-semana-siguiente').addEventListener('click', () => {
+      state.semanaOffset += 1;
+      render();
+      anunciar('Semana siguiente');
+    });
+
+    document.getElementById('btn-volver-hoy').addEventListener('click', () => {
+      state.semanaOffset = 0;
+      render();
+      anunciar('Volviendo a esta semana');
+    });
+
+    // Chip de guía: cerrarlo guarda la decisión en localStorage para que no vuelva
+    document.getElementById('btn-cerrar-guia').addEventListener('click', () => {
+      try {
+        localStorage.setItem(GUIA_CERRADA_KEY, 'true');
+      } catch (e) {
+        // Ignorar; si no hay localStorage, se cierra solo esta sesión
+      }
+      document.getElementById('guia-filtro').hidden = true;
     });
 
     // Actualizar timestamp cada minuto
