@@ -196,14 +196,32 @@
     return y + '-' + m + '-' + dd;
   }
 
+  // Arrays reusables de nombres en español
+  const DIAS_LARGOS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const DIAS_CORTOS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  const MESES_LARGOS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+                        'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  /**
+   * Devuelve el nombre del día en español. abrev=true devuelve "lun", "mar", etc.
+   */
+  function diaEs_(d, abrev) {
+    const idx = d.getDay();
+    return abrev ? DIAS_CORTOS[idx] : DIAS_LARGOS[idx];
+  }
+
+  /**
+   * Devuelve el nombre del mes en español (ignora tz: usamos la fecha local).
+   */
+  function mesEs_(d) {
+    return MESES_LARGOS[d.getMonth()];
+  }
+
   /**
    * Formatea una fecha a "jueves 12 de noviembre de 2026" en español.
    */
   function formatearFechaLarga(d) {
-    const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-    const meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                   'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-    return dias[d.getDay()] + ' ' + d.getDate() + ' de ' + meses[d.getMonth()] + ' de ' + d.getFullYear();
+    return diaEs_(d, false) + ' ' + d.getDate() + ' de ' + mesEs_(d) + ' de ' + d.getFullYear();
   }
 
   /**
@@ -663,11 +681,10 @@
     const $titulo = document.getElementById('semana-titulo');
     const $btnVolver = document.getElementById('btn-volver-hoy');
 
-    const tz = TZ;
     const inicioDia = semana.inicio.getDate();
     const finDia = semana.fin.getDate();
-    const inicioMes = mesEs_(semana.inicio, tz);
-    const finMes = mesEs_(semana.fin, tz);
+    const inicioMes = mesEs_(semana.inicio);
+    const finMes = mesEs_(semana.fin);
     const anio = semana.fin.getFullYear();
 
     // Si la semana cruza dos meses, mostrarlos ambos
@@ -709,7 +726,6 @@
     const semana = obtenerSemana(state.semanaOffset);
     const hoyKey = fechaKey(hoy());
     const hoyDate = hoy();
-    const tz = TZ;
 
     return '<div class="dias-semana">' + semana.dias.map(dia => {
       const diaKey = fechaKey(dia);
@@ -724,7 +740,7 @@
 
       const nombreDia = diaEs_(dia, false);
       const numero = dia.getDate();
-      const mes = mesEs_(dia, tz);
+      const mes = mesEs_(dia);
 
       let badge = '';
       if (esHoy)    badge = '<span class="dia-semana-badge dia-semana-badge--hoy">HOY</span>';
