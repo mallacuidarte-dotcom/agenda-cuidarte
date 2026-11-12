@@ -203,6 +203,41 @@
   }
 
   /**
+   * Convierte una hora formateada a minutos desde medianoche.
+   * Usado para ORDENAR actividades por hora correctamente.
+   *
+   * Ejemplos:
+   *   "9:00 a. m."  → 540  (9 * 60)
+   *   "12:00 p. m." → 720  (mediodía)
+   *   "3:30 p. m."  → 930
+   *   "12:00 a. m." → 0    (medianoche)
+   *   ""            → 999999 (sin hora: al final del grupo)
+   *
+   * Por qué: comparar "10:00" con "9:00" como texto da "10:00" < "9:00"
+   * porque alfabéticamente "1" < "9". Convertir a minutos arregla eso.
+   */
+  function horaAMinutos(texto) {
+    if (!texto) return 999999; // Sin hora: al final
+    const m = texto.match(/^(\d{1,2}):(\d{2})\s*([ap])\.?\s*m?\.?/i);
+    if (!m) return 999999;
+
+    let h = parseInt(m[1]);
+    const min = parseInt(m[2]);
+    const esPM = m[3].toLowerCase() === 'p';
+
+    // Manejar el caso especial de las 12:
+    // 12 a.m. = medianoche (hora 0)
+    // 12 p.m. = mediodía (hora 12)
+    if (h === 12) {
+      h = esPM ? 12 : 0;
+    } else if (esPM) {
+      h += 12;
+    }
+
+    return h * 60 + min;
+  }
+
+  /**
    * Formatea un timestamp relativo: "hace 3 minutos", "hace 2 horas".
    */
   function tiempoRelativo(timestamp) {
@@ -407,10 +442,12 @@
       });
     }
 
-    // Ordenar por fecha y luego por hora
+    // Ordenar por fecha y luego por hora de inicio.
+    // Convierte cada hora a minutos desde medianoche para comparar números,
+    // no texto. Así "9:00 a. m." viene antes que "10:00 a. m." correctamente.
     resultado.sort((a, b) => {
       if (a.fecha - b.fecha !== 0) return a.fecha - b.fecha;
-      return a.horaInicio.localeCompare(b.horaInicio);
+      return horaAMinutos(a.horaInicio) - horaAMinutos(b.horaInicio);
     });
 
     return resultado;
