@@ -95,6 +95,7 @@
   function parsearFecha(texto) {
     if (!texto || typeof texto !== 'string') return null;
     const t = texto.trim();
+    if (!t) return null;
 
     // Formato ISO: 2026-11-08
     let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
@@ -102,11 +103,35 @@
       return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]), 12, 0, 0);
     }
 
-    // Formato colombiano: 8/11/2026 (DD/MM/YYYY)
+    // Formato con slash: puede ser DD/MM/YYYY (Colombia) o MM/DD/YYYY (US).
+    // Heurística: si algún campo es mayor a 12, ese es el día.
+    // Si ambos son ≤ 12, asumimos DD/MM/YYYY (formato colombiano por defecto).
     m = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      const a = parseInt(m[1]);
+      const b = parseInt(m[2]);
+      const y = parseInt(m[3]);
+      if (a > 12) {
+        // DD/MM/YYYY confirmado (a=día)
+        return new Date(y, b - 1, a, 12, 0, 0);
+      } else if (b > 12) {
+        // MM/DD/YYYY confirmado (b=día)
+        return new Date(y, a - 1, b, 12, 0, 0);
+      } else {
+        // Ambiguo. Asumir DD/MM/YYYY (formato Colombia).
+        return new Date(y, b - 1, a, 12, 0, 0);
+      }
+    }
+
+    // Formato con guion: 12-11-2026 (DD-MM-YYYY)
+    m = t.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
     if (m) {
       return new Date(parseInt(m[3]), parseInt(m[2]) - 1, parseInt(m[1]), 12, 0, 0);
     }
+
+    // Último recurso: dejar que el navegador lo intente
+    const d = new Date(t);
+    if (!isNaN(d.getTime())) return d;
 
     return null;
   }
@@ -295,8 +320,13 @@
     for (const fila of filas) {
       // Los nombres de las columnas vienen del header del Sheets.
       // Se mantienen tolerantes por si cambia la mayúscula o un espacio.
+      // Lectura TOLERANTE: aceptamos varios nombres por columna para que no se
+      // rompa si articulación cambia los encabezados del Sheets. Los primeros
+      // valores son los que están en Sheets AHORA (noviembre 2026).
       const fecha = parsearFecha(obtenerCampo(fila, ['Fecha', 'fecha']));
-      const territorio = normalizarTerritorio(obtenerCampo(fila, ['Territorio', 'territorio']));
+      const territorio = normalizarTerritorio(obtenerCampo(fila, [
+        'Comuna', 'comuna', 'Territorio', 'territorio'
+      ]));
       const actividad = String(obtenerCampo(fila, ['Actividad', 'actividad']) || '').trim();
 
       // Skip si falta algo esencial o la fecha ya pasó
@@ -308,17 +338,36 @@
         fechaKey: fechaKey(fecha),
         territorio: territorio,
         actividad: actividad,
-        horaInicio: String(obtenerCampo(fila, ['Hora inicio', 'hora inicio']) || '').trim(),
-        horaFin: String(obtenerCampo(fila, ['Hora fin', 'hora fin']) || '').trim(),
+        horaInicio: String(obtenerCampo(fila, [
+          'Hora de inicio', 'Hora inicio', 'hora de inicio', 'hora inicio'
+        ]) || '').trim(),
+        horaFin: String(obtenerCampo(fila, [
+          'Hora de finalización', 'Hora de finalizacion', 'Hora fin',
+          'hora de finalización', 'hora fin'
+        ]) || '').trim(),
         lugar: String(obtenerCampo(fila, ['Lugar', 'lugar']) || '').trim(),
-        responsable: String(obtenerCampo(fila, ['Responsable', 'responsable']) || '').trim(),
+        responsable: String(obtenerCampo(fila, [
+          'Responsable (entidad)', 'Responsable entidad', 'Responsable', 'responsable'
+        ]) || '').trim(),
         estado: normalizarEstado(obtenerCampo(fila, ['Estado', 'estado'])),
-        espejoActividad: String(obtenerCampo(fila, ['Actividad espejo', 'actividad espejo']) || '').trim(),
-        espejoHoraInicio: String(obtenerCampo(fila, ['Hora inicio espejo', 'hora inicio espejo']) || '').trim(),
-        espejoHoraFin: String(obtenerCampo(fila, ['Hora fin espejo', 'hora fin espejo']) || '').trim(),
+        espejoActividad: String(obtenerCampo(fila, [
+          'Actividad espejo', 'actividad espejo'
+        ]) || '').trim(),
+        espejoHoraInicio: String(obtenerCampo(fila, [
+          'Hora de inicio espejo', 'Hora inicio espejo', 'hora de inicio espejo'
+        ]) || '').trim(),
+        espejoHoraFin: String(obtenerCampo(fila, [
+          'Hora de finalización espejo', 'Hora de finalizacion espejo',
+          'Hora fin espejo', 'hora de finalización espejo'
+        ]) || '').trim(),
         espejoLugar: String(obtenerCampo(fila, ['Lugar espejo', 'lugar espejo']) || '').trim(),
-        espejoResponsable: String(obtenerCampo(fila, ['Responsable espejo', 'responsable espejo']) || '').trim(),
-        nota: String(obtenerCampo(fila, ['Nota cambio', 'nota cambio', 'Nota', 'nota']) || '').trim()
+        espejoResponsable: String(obtenerCampo(fila, [
+          'Responsable (entidad) espejo', 'Responsable entidad espejo',
+          'Responsable espejo', 'responsable espejo'
+        ]) || '').trim(),
+        nota: String(obtenerCampo(fila, [
+          'Nota de cambio', 'Nota cambio', 'nota de cambio', 'Nota', 'nota'
+        ]) || '').trim()
       });
     }
 
