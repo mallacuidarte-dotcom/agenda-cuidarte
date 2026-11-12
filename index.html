@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es-CO">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#322A3C">
+  <meta name="description" content="Agenda interactiva del Proyecto Cuidarte · Subsecretaría de Equidad de Género · Alcaldía de Cali. Consulta actividades por territorio y fecha.">
+
+  <title>Agenda Cuidarte · Proyecto Cuidarte</title>
+
+  <!-- Preconnect para que la carga del CSV sea más rápida -->
+  <link rel="preconnect" href="https://docs.google.com">
+  <link rel="dns-prefetch" href="https://docs.google.com">
+
+  <!-- Inter como fuente principal (fallback a system) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+
+  <!-- Favicon desde el logo de Cuidarte -->
+  <link rel="icon" type="image/svg+xml" href="assets/logos/cuidarte-color.svg">
+
+  <!-- Estilos propios -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+  <!-- Skip link (accesibilidad: primer foco al tabular) -->
+  <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
+
+  <!-- Live region para anunciar cambios al lector de pantalla -->
+  <div id="anuncio-sr" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- ============================================================ -->
+  <!-- HEADER: logos institucionales + título + estado actualización -->
+  <!-- ============================================================ -->
+  <header class="app-header" role="banner">
+    <div class="header-inner">
+      <div class="header-logos">
+        <img src="assets/logos/cuidarte-color.svg"
+             alt="Logo Proyecto Cuidarte"
+             class="logo-cuidarte"
+             width="120" height="24">
+        <span class="logo-divider" aria-hidden="true"></span>
+        <img src="assets/logos/alcaldia-color.svg"
+             alt="Logo Alcaldía de Cali"
+             class="logo-alcaldia"
+             width="140" height="28">
+      </div>
+
+      <div class="header-actions">
+        <!-- Estado de actualización: visible siempre, actúa como botón refresh -->
+        <button id="btn-actualizar"
+                class="btn-actualizar"
+                type="button"
+                aria-label="Actualizar la agenda. Última actualización: pendiente">
+          <svg class="icono-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+          </svg>
+          <span class="btn-actualizar-texto">
+            <span class="btn-actualizar-accion">Actualizar</span>
+            <span id="timestamp-actualizacion" class="btn-actualizar-timestamp">Cargando...</span>
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Título principal + subtítulo -->
+    <div class="header-titulo">
+      <h1 class="app-titulo">Agenda interactiva</h1>
+      <p class="app-subtitulo">Proyecto Cuidarte · Subsecretaría de Equidad de Género</p>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- BARRA DE FILTROS: comuna, búsqueda, vista                     -->
+  <!-- ============================================================ -->
+  <section class="filtros-wrapper" aria-label="Filtros de búsqueda">
+    <div class="filtros-inner">
+
+      <!-- Filtro: Territorio -->
+      <div class="filtro-grupo">
+        <label for="filtro-comuna" class="filtro-label">
+          Territorio
+        </label>
+        <div class="select-wrapper">
+          <select id="filtro-comuna"
+                  class="filtro-select"
+                  aria-describedby="filtro-comuna-ayuda">
+            <option value="">Todos los territorios</option>
+            <!-- Las opciones de territorio se insertan desde JS para que sean dinámicas -->
+          </select>
+          <svg class="select-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </div>
+        <p id="filtro-comuna-ayuda" class="filtro-ayuda sr-only">
+          Elige un territorio para ver solo sus actividades
+        </p>
+      </div>
+
+      <!-- Filtro: Búsqueda por texto -->
+      <div class="filtro-grupo filtro-busqueda-grupo">
+        <label for="filtro-busqueda" class="filtro-label">
+          Buscar actividad
+        </label>
+        <div class="input-wrapper">
+          <svg class="input-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input id="filtro-busqueda"
+                 type="search"
+                 class="filtro-input"
+                 placeholder="Nombre, lugar o entidad"
+                 autocomplete="off"
+                 aria-describedby="filtro-busqueda-ayuda">
+          <button id="btn-limpiar-busqueda"
+                  type="button"
+                  class="input-limpiar"
+                  aria-label="Limpiar búsqueda"
+                  hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <p id="filtro-busqueda-ayuda" class="filtro-ayuda sr-only">
+          Escribe palabras clave de la actividad, el lugar o la entidad
+        </p>
+      </div>
+
+    </div>
+
+    <!-- Chips de filtros activos: se muestran solo cuando hay filtros aplicados -->
+    <div id="filtros-activos" class="filtros-activos" aria-live="polite" hidden>
+      <span class="filtros-activos-label">Filtros activos:</span>
+      <!-- Chips insertados desde JS -->
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- SELECTOR DE VISTA: Hoy / Semana / Mes / Consolidado          -->
+  <!-- Nota: Fase 1 sólo tiene "Hoy". Las demás aparecen             -->
+  <!-- deshabilitadas con tooltip "Próximamente" para dar contexto.  -->
+  <!-- ============================================================ -->
+  <nav class="vistas-nav" aria-label="Cambiar vista de la agenda">
+    <ul class="vistas-tabs" role="tablist">
+      <li role="none">
+        <button class="vista-tab vista-tab--activa"
+                role="tab"
+                aria-selected="true"
+                aria-controls="contenido-principal"
+                data-vista="hoy">
+          Hoy
+        </button>
+      </li>
+      <li role="none">
+        <button class="vista-tab"
+                role="tab"
+                aria-selected="false"
+                data-vista="semana"
+                disabled
+                title="Disponible en la próxima versión">
+          Esta semana
+          <span class="vista-tab-badge">Pronto</span>
+        </button>
+      </li>
+      <li role="none">
+        <button class="vista-tab"
+                role="tab"
+                aria-selected="false"
+                data-vista="mes"
+                disabled
+                title="Disponible en la próxima versión">
+          Este mes
+          <span class="vista-tab-badge">Pronto</span>
+        </button>
+      </li>
+      <li role="none">
+        <button class="vista-tab"
+                role="tab"
+                aria-selected="false"
+                data-vista="consolidado"
+                disabled
+                title="Disponible en la próxima versión">
+          Consolidado
+          <span class="vista-tab-badge">Pronto</span>
+        </button>
+      </li>
+    </ul>
+  </nav>
+
+  <!-- ============================================================ -->
+  <!-- CONTENIDO PRINCIPAL: aquí se pinta la vista activa            -->
+  <!-- ============================================================ -->
+  <main id="contenido-principal" class="contenido" role="main" tabindex="-1">
+
+    <!-- Contexto temporal: fecha de hoy en grande, para dar orientación -->
+    <div class="vista-encabezado">
+      <h2 id="vista-titulo" class="vista-titulo">Hoy</h2>
+      <p id="vista-fecha" class="vista-fecha">
+        <!-- JS llena con "jueves 12 de noviembre" -->
+      </p>
+    </div>
+
+    <!-- ESTADO: Cargando por primera vez -->
+    <div id="estado-cargando" class="estado estado--cargando" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p class="estado-mensaje">Cargando la agenda...</p>
+      <p class="estado-detalle">Esto puede tardar unos segundos.</p>
+    </div>
+
+    <!-- ESTADO: Error de carga -->
+    <div id="estado-error" class="estado estado--error" role="alert" hidden>
+      <svg class="estado-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <h3 class="estado-titulo">No pudimos cargar la agenda</h3>
+      <p id="estado-error-mensaje" class="estado-mensaje">
+        Revisa tu conexión a internet e intenta de nuevo.
+      </p>
+      <button class="btn btn--primario" type="button" onclick="window.appCuidarte.cargarDatos()">
+        Volver a intentar
+      </button>
+    </div>
+
+    <!-- ESTADO: Sin actividades hoy -->
+    <div id="estado-vacio" class="estado estado--vacio" hidden>
+      <svg class="estado-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+        <line x1="16" y1="2" x2="16" y2="6"></line>
+        <line x1="8" y1="2" x2="8" y2="6"></line>
+        <line x1="3" y1="10" x2="21" y2="10"></line>
+      </svg>
+      <h3 class="estado-titulo">No hay actividades para mostrar</h3>
+      <p id="estado-vacio-mensaje" class="estado-mensaje">
+        No hay actividades programadas para hoy.
+      </p>
+      <p class="estado-detalle">
+        Si crees que debería haber actividades aquí, toca Actualizar arriba o contacta a articulación.
+      </p>
+    </div>
+
+    <!-- CONTENEDOR DE RESULTADOS: aquí se inyectan las tarjetas de actividad -->
+    <div id="lista-actividades" class="lista-actividades" hidden>
+      <!-- JS inserta aquí las tarjetas agrupadas por territorio -->
+    </div>
+
+    <!-- Contador de resultados visible abajo, para dar contexto -->
+    <div id="resultados-info" class="resultados-info" aria-live="polite" hidden>
+      <span id="resultados-cantidad"></span>
+    </div>
+
+  </main>
+
+  <!-- ============================================================ -->
+  <!-- FOOTER                                                        -->
+  <!-- ============================================================ -->
+  <footer class="app-footer" role="contentinfo">
+    <div class="footer-inner">
+      <p class="footer-texto">
+        Proyecto Cuidarte · Subsecretaría de Equidad de Género · Alcaldía de Cali
+      </p>
+      <p class="footer-texto footer-texto--pequeno">
+        Esta agenda se actualiza desde Google Sheets. Si ves información desactualizada, toca Actualizar.
+      </p>
+    </div>
+  </footer>
+
+  <!-- PapaParse: parser de CSV robusto (45KB gzipped) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+  <!-- Lógica de la app -->
+  <script src="app.js"></script>
+</body>
+</html>
