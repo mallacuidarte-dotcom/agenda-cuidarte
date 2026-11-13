@@ -218,6 +218,14 @@
   }
 
   /**
+   * Capitaliza la primera letra de un string: "hola" → "Hola".
+   */
+  function cap_(s) {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+
+  /**
    * Formatea una fecha a "jueves 12 de noviembre de 2026" en español.
    */
   function formatearFechaLarga(d) {
