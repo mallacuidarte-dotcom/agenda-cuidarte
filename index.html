@@ -23,13 +23,10 @@
   <!-- Estilos propios. El ?v= se incrementa en cada despliegue para romper
        cache del navegador — si no, los usuarios ven versiones viejas aunque
        GitHub Pages ya tenga la nueva. -->
-  <link rel="stylesheet" href="styles.css?v=20261112e">
+  <link rel="stylesheet" href="styles.css?v=20261112f">
 </head>
 
 <body>
-  <!-- Skip link (accesibilidad: primer foco al tabular) -->
-  <a href="#contenido-principal" class="skip-link">Saltar al contenido principal</a>
-
   <!-- Live region para anunciar cambios al lector de pantalla -->
   <div id="anuncio-sr" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></div>
 
@@ -175,22 +172,8 @@
         <button class="vista-tab"
                 role="tab"
                 aria-selected="false"
-                data-vista="mes"
-                disabled
-                title="Disponible en la próxima versión">
+                data-vista="mes">
           Este mes
-          <span class="vista-tab-badge">Pronto</span>
-        </button>
-      </li>
-      <li role="none">
-        <button class="vista-tab"
-                role="tab"
-                aria-selected="false"
-                data-vista="consolidado"
-                disabled
-                title="Disponible en la próxima versión">
-          Consolidado
-          <span class="vista-tab-badge">Pronto</span>
         </button>
       </li>
     </ul>
@@ -242,6 +225,16 @@
           </svg>
         </button>
       </div>
+    </div>
+
+    <!-- Encabezado de la vista MES: título + total -->
+    <div id="encabezado-mes" class="vista-encabezado" hidden>
+      <h2 id="mes-titulo" class="vista-titulo">
+        <!-- JS llena con "Noviembre 2026" -->
+      </h2>
+      <p id="mes-subtitulo" class="vista-fecha">
+        <!-- JS llena con contadores generales -->
+      </p>
     </div>
 
     <!-- Chip discreto de guía: sugiere filtrar por territorio en vista semana -->
@@ -348,6 +341,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <!-- Lógica de la app (?v= rompe cache; ver comentario arriba) -->
-  <script src="app.js?v=20261112e"></script>
+  <script src="app.js?v=20261112f"></script>
 </body>
 </html>

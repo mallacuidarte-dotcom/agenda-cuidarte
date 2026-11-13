@@ -157,6 +157,63 @@
   }
 
   /**
+   * Devuelve el mes actual con sus semanas lunes-domingo que lo cubren.
+   * Incluye días del mes anterior/siguiente que caen dentro de esas semanas,
+   * marcados con esDelMes=false para distinguirlos visualmente.
+   *
+   * @return {{inicio, fin, nombreMes, anio, semanas, totalDiasMes}}
+   */
+  function obtenerMesActual() {
+    const ahora = new Date();
+    const anio = ahora.getFullYear();
+    const mes = ahora.getMonth();
+    const primerDia = new Date(anio, mes, 1, 12, 0, 0);
+    const ultimoDia = new Date(anio, mes + 1, 0, 23, 59, 59);
+
+    // Semana lun-dom que contiene el primer día del mes
+    const dow1 = primerDia.getDay();
+    const diasAlLunes1 = dow1 === 0 ? -6 : 1 - dow1;
+    const inicioGrid = new Date(primerDia);
+    inicioGrid.setDate(primerDia.getDate() + diasAlLunes1);
+    inicioGrid.setHours(0, 0, 0, 0);
+
+    // Partir en semanas de 7 días hasta pasar el último día del mes
+    const semanas = [];
+    let cursor = new Date(inicioGrid);
+    let semanaIndice = 1;
+    while (cursor <= ultimoDia) {
+      const dias = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(cursor);
+        d.setDate(cursor.getDate() + i);
+        d.setHours(12, 0, 0, 0);
+        dias.push({
+          fecha: d,
+          esDelMes: d.getMonth() === mes
+        });
+      }
+      semanas.push({
+        numero: semanaIndice++,
+        inicio: new Date(cursor),
+        fin: dias[6].fecha,
+        dias: dias
+      });
+      cursor = new Date(cursor);
+      cursor.setDate(cursor.getDate() + 7);
+      cursor.setHours(0, 0, 0, 0);
+    }
+
+    return {
+      inicio: primerDia,
+      fin: ultimoDia,
+      nombreMes: mesEs_(primerDia),
+      anio: anio,
+      semanas: semanas,
+      totalDiasMes: new Date(anio, mes + 1, 0).getDate()
+    };
+  }
+
+  /**
    * Devuelve la semana lunes-domingo correspondiente a hoy + offset semanas.
    *
    * @param {number} offset - 0 = esta semana, -1 = anterior, 1 = siguiente.
@@ -558,6 +615,12 @@
       resultado = resultado.filter(a => a.fecha >= semana.inicio && a.fecha <= semana.fin);
     }
 
+    // Vista "Mes": actividades del mes actual
+    if (state.vistaActiva === 'mes') {
+      const mes = obtenerMesActual();
+      resultado = resultado.filter(a => a.fecha >= mes.inicio && a.fecha <= mes.fin);
+    }
+
     // Filtro: territorio
     if (state.filtroComuna) {
       resultado = resultado.filter(a => a.territorio === state.filtroComuna);
@@ -656,6 +719,22 @@
       return;
     }
 
+    // Vista MES: drill-down según si hay filtro de territorio
+    if (state.vistaActiva === 'mes') {
+      $lista.hidden = false;
+      if (state.filtroComuna) {
+        // Hay filtro: calendario detallado del territorio
+        $lista.innerHTML = renderCalendarioMes(filtradas);
+      } else {
+        // Sin filtro: consolidado dinámico (vista supervisora)
+        $lista.innerHTML = renderConsolidadoMes();
+        conectarChipsTerritorio();
+      }
+      $resultados.hidden = true;
+      if (filtradas.length > 0) $pdfBtn.hidden = false;
+      return;
+    }
+
     // Vista HOY: si no hay nada, estado vacío con mensaje contextual
     if (filtradas.length === 0) {
       $vacio.hidden = false;
@@ -681,16 +760,60 @@
   function renderEncabezadoVista() {
     const $hoy = document.getElementById('encabezado-hoy');
     const $semana = document.getElementById('encabezado-semana');
+    const $mes = document.getElementById('encabezado-mes');
+
+    // Ocultar todos primero
+    $hoy.hidden = true;
+    $semana.hidden = true;
+    $mes.hidden = true;
 
     if (state.vistaActiva === 'semana') {
-      $hoy.hidden = true;
       $semana.hidden = false;
       renderNavSemana();
+    } else if (state.vistaActiva === 'mes') {
+      $mes.hidden = false;
+      renderEncabezadoMes();
     } else {
       $hoy.hidden = false;
-      $semana.hidden = true;
       renderFechaActual();
     }
+  }
+
+  /**
+   * Encabezado de vista mes: "Noviembre 2026" + subtítulo con contexto.
+   */
+  function renderEncabezadoMes() {
+    const mes = obtenerMesActual();
+    document.getElementById('mes-titulo').textContent = cap_(mes.nombreMes) + ' ' + mes.anio;
+
+    const total = contarActividadesDelMes();
+    let sub;
+    if (state.filtroComuna) {
+      sub = 'Vista detallada de ' + state.filtroComuna + ' · ' + total + (total === 1 ? ' actividad' : ' actividades');
+    } else {
+      sub = 'Vista consolidada · ' + total + (total === 1 ? ' actividad' : ' actividades') + ' en el mes';
+    }
+    document.getElementById('mes-subtitulo').textContent = sub;
+  }
+
+  /**
+   * Cuenta las actividades del mes actual (sin canceladas, como solicitado).
+   * Considera filtros activos.
+   */
+  function contarActividadesDelMes() {
+    const mes = obtenerMesActual();
+    return state.actividades.filter(a => {
+      if (a.fecha < mes.inicio || a.fecha > mes.fin) return false;
+      if (a.estado === 'Cancelada') return false;
+      if (state.filtroComuna && a.territorio !== state.filtroComuna) return false;
+      if (state.filtroBusqueda) {
+        const q = normalizar(state.filtroBusqueda);
+        return normalizar(a.actividad).indexOf(q) >= 0 ||
+               normalizar(a.lugar).indexOf(q) >= 0 ||
+               normalizar(a.responsable).indexOf(q) >= 0;
+      }
+      return true;
+    }).length;
   }
 
   /**
@@ -794,6 +917,274 @@
 
       return '<section class="' + clase + '">' + header + contenido + '</section>';
     }).join('') + '</div>';
+  }
+
+  /**
+   * Devuelve la densidad ("cero", "baja", "media", "alta") según cantidad.
+   * Usado para colorear los chips del consolidado mes.
+   */
+  function densidadPorConteo(n) {
+    if (n === 0) return 'cero';
+    if (n <= 2) return 'baja';
+    if (n <= 5) return 'media';
+    return 'alta';
+  }
+
+  /**
+   * Cuenta actividades (sin canceladas) de un territorio en una semana.
+   */
+  function contarActividadesEnSemana(territorio, semana) {
+    const inicio = semana.inicio;
+    const fin = semana.fin;
+    return state.actividades.filter(a => {
+      if (a.territorio !== territorio) return false;
+      if (a.estado === 'Cancelada') return false;
+      if (a.fecha < inicio || a.fecha > fin) return false;
+      if (state.filtroBusqueda) {
+        const q = normalizar(state.filtroBusqueda);
+        return normalizar(a.actividad).indexOf(q) >= 0 ||
+               normalizar(a.lugar).indexOf(q) >= 0 ||
+               normalizar(a.responsable).indexOf(q) >= 0;
+      }
+      return true;
+    }).length;
+  }
+
+  /**
+   * Renderiza el consolidado dinámico del mes (sin filtro de territorio).
+   * Diseño: resumen arriba + card por semana con chips de territorio coloreados.
+   */
+  function renderConsolidadoMes() {
+    const mes = obtenerMesActual();
+    const territorios = TERRITORIOS_VALIDOS.slice();
+    // Añadir cualquier territorio nuevo que aparezca en datos
+    const territoriosEnDatos = new Set(state.actividades.map(a => a.territorio));
+    territoriosEnDatos.forEach(t => {
+      if (territorios.indexOf(t) < 0) territorios.push(t);
+    });
+
+    // Resumen general del mes
+    const total = contarActividadesDelMes();
+    const semanaActualInicio = obtenerSemana(0).inicio.getTime();
+
+    const resumen =
+      '<div class="mes-resumen">' +
+        '<h3 class="mes-resumen-titulo">' + escapar(cap_(mes.nombreMes)) + ' ' + mes.anio + '</h3>' +
+        '<div class="mes-resumen-metricas">' +
+          '<div class="mes-resumen-metrica">' +
+            '<span class="mes-resumen-metrica-valor">' + total + '</span>' +
+            '<span class="mes-resumen-metrica-etiqueta">Actividades</span>' +
+          '</div>' +
+          '<div class="mes-resumen-metrica">' +
+            '<span class="mes-resumen-metrica-valor">' + territorios.length + '</span>' +
+            '<span class="mes-resumen-metrica-etiqueta">Territorios</span>' +
+          '</div>' +
+          '<div class="mes-resumen-metrica">' +
+            '<span class="mes-resumen-metrica-valor">' + mes.semanas.length + '</span>' +
+            '<span class="mes-resumen-metrica-etiqueta">Semanas</span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    // Cards por semana
+    const cardsSemanas = mes.semanas.map(sem => {
+      const esActual = sem.inicio.getTime() === semanaActualInicio;
+      let totalSemana = 0;
+
+      const chipsHtml = territorios.map(terr => {
+        const n = contarActividadesEnSemana(terr, sem);
+        totalSemana += n;
+        const densidad = densidadPorConteo(n);
+        return '' +
+          '<button class="chip-territorio" type="button" ' +
+                  'data-densidad="' + densidad + '" ' +
+                  'data-territorio="' + escapar(terr) + '" ' +
+                  'data-semana-inicio="' + sem.inicio.getTime() + '" ' +
+                  'aria-label="' + escapar(terr) + ': ' + n +
+                  (n === 1 ? ' actividad' : ' actividades') + ' en semana ' + sem.numero + '. Toca para ver.">' +
+            '<span class="chip-territorio-nombre">' + escapar(terr) + '</span>' +
+            '<span class="chip-territorio-conteo">' + n + '</span>' +
+          '</button>';
+      }).join('');
+
+      const rango = sem.inicio.getDate() + '-' + sem.fin.getDate();
+      return '' +
+        '<article class="semana-card' + (esActual ? ' semana-card--actual' : '') + '">' +
+          '<header class="semana-card-header">' +
+            '<div class="semana-card-titulo-wrap">' +
+              '<h3 class="semana-card-titulo">Semana ' + sem.numero + '</h3>' +
+              '<span class="semana-card-rango">' + rango + ' de ' + escapar(mesEs_(sem.inicio)) + '</span>' +
+              (esActual ? '<span class="semana-card-actual-badge">Actual</span>' : '') +
+            '</div>' +
+            '<span class="semana-card-total">' + totalSemana +
+              (totalSemana === 1 ? ' actividad' : ' actividades') + '</span>' +
+          '</header>' +
+          '<div class="territorios-grid">' + chipsHtml + '</div>' +
+        '</article>';
+    }).join('');
+
+    // Leyenda de colores (educa al usuario sobre lo que significan)
+    const leyenda =
+      '<div class="consolidado-leyenda" role="group" aria-label="Leyenda de colores">' +
+        '<div class="consolidado-leyenda-item">' +
+          '<span class="consolidado-leyenda-color" style="background:#FCEBEB;border:1px solid rgba(121,31,31,0.15)"></span>' +
+          'Sin actividad' +
+        '</div>' +
+        '<div class="consolidado-leyenda-item">' +
+          '<span class="consolidado-leyenda-color" style="background:#FAEEDA;border:1px solid rgba(99,56,6,0.15)"></span>' +
+          '1-2 actividades' +
+        '</div>' +
+        '<div class="consolidado-leyenda-item">' +
+          '<span class="consolidado-leyenda-color" style="background:#B5DACF"></span>' +
+          '3-5 actividades' +
+        '</div>' +
+        '<div class="consolidado-leyenda-item">' +
+          '<span class="consolidado-leyenda-color" style="background:#322A3C"></span>' +
+          '6 o más' +
+        '</div>' +
+      '</div>';
+
+    return resumen +
+      '<div class="semanas-consolidado">' + cardsSemanas + '</div>' +
+      leyenda;
+  }
+
+  /**
+   * Al tocar un chip de territorio, aplica filtros y navega a vista semana
+   * con la semana correspondiente.
+   */
+  function conectarChipsTerritorio() {
+    document.querySelectorAll('.chip-territorio').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const terr = chip.dataset.territorio;
+        const semanaInicio = parseInt(chip.dataset.semanaInicio);
+
+        // Aplicar filtro de territorio
+        state.filtroComuna = terr;
+        document.getElementById('filtro-comuna').value = terr;
+
+        // Calcular offset: diferencia en semanas entre la semana deseada y la actual
+        const actualInicio = obtenerSemana(0).inicio.getTime();
+        const diff = semanaInicio - actualInicio;
+        const semanasOffset = Math.round(diff / (7 * 24 * 60 * 60 * 1000));
+        state.semanaOffset = semanasOffset;
+
+        // Cambiar a vista semana
+        state.vistaActiva = 'semana';
+        document.querySelectorAll('.vista-tab').forEach(t => {
+          const esSem = t.dataset.vista === 'semana';
+          t.classList.toggle('vista-tab--activa', esSem);
+          t.setAttribute('aria-selected', esSem ? 'true' : 'false');
+        });
+
+        anunciar('Navegando a ' + terr + ' en semana seleccionada');
+        render();
+        // Scroll al top para que el usuario vea el cambio
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  /**
+   * Renderiza el calendario del mes para UN territorio específico.
+   * En desktop: grid 7×N estilo Google Calendar.
+   * En mobile: lista por día (grid se oculta vía CSS, lista se muestra).
+   */
+  function renderCalendarioMes(filtradas) {
+    const mes = obtenerMesActual();
+    const hoyKey = fechaKey(hoy());
+
+    // ===== Versión GRID (desktop) =====
+    const headerDias = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+    const headerGrid = headerDias.map(d =>
+      '<div class="calendario-mes-dia-nombre">' + d + '</div>'
+    ).join('');
+
+    const celdasGrid = mes.semanas.flatMap(sem =>
+      sem.dias.map(dia => {
+        const diaKey = fechaKey(dia.fecha);
+        const esHoy = diaKey === hoyKey;
+        const acts = filtradas.filter(a => a.fechaKey === diaKey);
+
+        let clases = 'calendario-mes-celda';
+        if (!dia.esDelMes) clases += ' calendario-mes-celda--fuera';
+        if (esHoy) clases += ' calendario-mes-celda--hoy';
+
+        const eventosHtml = acts.slice(0, 3).map(a => {
+          let clEv = 'calendario-mes-evento';
+          if (a.estado === 'Cancelada') clEv += ' calendario-mes-evento--cancelado';
+          else if (a.estado === 'Ajustada') clEv += ' calendario-mes-evento--ajustado';
+          return '<div class="' + clEv + '" title="' + escapar(a.actividad) + '">' +
+                 (a.horaInicio ? escapar(a.horaInicio) + ' ' : '') +
+                 escapar(a.actividad) +
+                 '</div>';
+        }).join('');
+
+        const mas = acts.length > 3
+          ? '<div class="calendario-mes-evento-mas">+' + (acts.length - 3) + ' más</div>'
+          : '';
+
+        return '' +
+          '<div class="' + clases + '">' +
+            '<span class="calendario-mes-dia-numero">' + dia.fecha.getDate() + '</span>' +
+            eventosHtml + mas +
+          '</div>';
+      })
+    ).join('');
+
+    const grid =
+      '<div class="calendario-mes">' +
+        '<div class="calendario-mes-dias-header">' + headerGrid + '</div>' +
+        '<div class="calendario-mes-grid">' + celdasGrid + '</div>' +
+      '</div>';
+
+    // ===== Versión LISTA (mobile) =====
+    // Solo mostrar días del mes (no los de relleno)
+    const diasDelMes = mes.semanas.flatMap(s => s.dias).filter(d => d.esDelMes);
+
+    const lista = '<div class="calendario-mes-lista">' +
+      diasDelMes.map(dia => {
+        const diaKey = fechaKey(dia.fecha);
+        const esHoy = diaKey === hoyKey;
+        const esPasado = dia.fecha < hoy() && !esHoy;
+        const acts = filtradas.filter(a => a.fechaKey === diaKey);
+
+        let clase = 'dia-semana';
+        if (esHoy)    clase += ' dia-semana--hoy';
+        if (esPasado) clase += ' dia-semana--pasado';
+
+        let badge = '';
+        if (esHoy)    badge = '<span class="dia-semana-badge dia-semana-badge--hoy">HOY</span>';
+        if (esPasado) badge = '<span class="dia-semana-badge dia-semana-badge--pasado">Ya pasó</span>';
+
+        const header =
+          '<header class="dia-semana-header">' +
+            '<div class="dia-semana-nombre">' +
+              '<span class="dia-semana-nombre-dia">' + escapar(diaEs_(dia.fecha, false)) + '</span>' +
+              '<span class="dia-semana-nombre-fecha">' + dia.fecha.getDate() + ' de ' + escapar(mesEs_(dia.fecha)) + '</span>' +
+              badge +
+            '</div>' +
+            '<span class="dia-semana-contador">' +
+              (acts.length === 0 ? 'Sin actividades' :
+               acts.length === 1 ? '1 actividad' :
+               acts.length + ' actividades') +
+            '</span>' +
+          '</header>';
+
+        let contenido;
+        if (acts.length === 0) {
+          contenido = '<p class="dia-semana-vacio">Sin actividades programadas para este día</p>';
+        } else {
+          contenido = '<div class="dia-semana-actividades">' +
+            acts.map(renderTarjeta).join('') +
+          '</div>';
+        }
+
+        return '<section class="' + clase + '">' + header + contenido + '</section>';
+      }).join('') +
+    '</div>';
+
+    return grid + lista;
   }
 
   /**
@@ -1190,6 +1581,8 @@
         state.vistaActiva = vista;
         // Al cambiar de vista, resetear offset de semana (más predecible)
         if (vista === 'semana') state.semanaOffset = 0;
+        // La vista mes siempre arranca con el mes actual, sin navegación
+        // (según decisión de UX: solo mes en curso)
         document.querySelectorAll('.vista-tab').forEach(t => {
           t.classList.toggle('vista-tab--activa', t === tab);
           t.setAttribute('aria-selected', t === tab ? 'true' : 'false');

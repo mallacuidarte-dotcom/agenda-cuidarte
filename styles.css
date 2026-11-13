@@ -193,27 +193,6 @@ ul {
   border: 0;
 }
 
-/* Skip link: aparece al tabular */
-.skip-link {
-  position: absolute;
-  top: -40px;
-  left: var(--space-4);
-  background: var(--violeta-900);
-  color: var(--blanco);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  font-weight: var(--font-semibold);
-  z-index: 100;
-  transition: top var(--transition-fast);
-}
-
-.skip-link:focus {
-  top: var(--space-4);
-  outline: 3px solid var(--violeta-200);
-  outline-offset: 2px;
-}
-
 /* Foco visible global: siempre claro */
 :focus-visible {
   outline: 3px solid var(--violeta-900);
@@ -879,6 +858,335 @@ a:focus-visible {
   gap: var(--space-3);
 }
 
+/* ============================================================
+   VISTA MES: CONSOLIDADO DINÁMICO (sin filtro de territorio)
+   ============================================================ */
+
+.mes-resumen {
+  background: linear-gradient(135deg, var(--violeta-900) 0%, var(--violeta-700) 100%);
+  color: var(--blanco);
+  padding: var(--space-5);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+  box-shadow: var(--shadow-md);
+}
+
+.mes-resumen-titulo {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  margin-bottom: var(--space-3);
+  text-transform: capitalize;
+}
+
+.mes-resumen-metricas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.mes-resumen-metrica {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mes-resumen-metrica-valor {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  line-height: 1;
+}
+
+.mes-resumen-metrica-etiqueta {
+  font-size: var(--text-xs);
+  color: var(--violeta-200);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Semanas del mes: cada una es una card con chips de territorio */
+.semanas-consolidado {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.semana-card {
+  background: var(--blanco);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-4) var(--space-5);
+}
+
+.semana-card--actual {
+  box-shadow: 0 0 0 2px var(--coral-cuidarte), var(--shadow-md);
+}
+
+.semana-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--gris-200);
+  flex-wrap: wrap;
+}
+
+.semana-card-titulo-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.semana-card-titulo {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: var(--violeta-900);
+}
+
+.semana-card-rango {
+  font-size: var(--text-sm);
+  color: var(--gris-700);
+}
+
+.semana-card-actual-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  background: var(--coral-cuidarte);
+  color: var(--blanco);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.semana-card-total {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--violeta-900);
+  background: var(--violeta-50);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+}
+
+/* Grid de territorios: 2 columnas en mobile, más en desktop */
+.territorios-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-2);
+}
+
+/* Chip territorio: visualmente dinámico con color según cantidad */
+.chip-territorio {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+  min-height: 56px;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  border: 2px solid transparent;
+}
+
+.chip-territorio:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.chip-territorio:active {
+  transform: translateY(0);
+}
+
+/* Densidad: 0 actividades */
+.chip-territorio[data-densidad="cero"] {
+  background: var(--rojo-100);
+  color: var(--rojo-700);
+  border-color: rgba(121, 31, 31, 0.15);
+}
+
+/* Densidad: baja (1-2 actividades) */
+.chip-territorio[data-densidad="baja"] {
+  background: var(--ambar-100);
+  color: var(--ambar-700);
+  border-color: rgba(99, 56, 6, 0.15);
+}
+
+/* Densidad: media (3-5 actividades) */
+.chip-territorio[data-densidad="media"] {
+  background: var(--teal-100);
+  color: var(--teal-500);
+  border-color: rgba(69, 135, 122, 0.25);
+}
+
+/* Densidad: alta (6+ actividades) */
+.chip-territorio[data-densidad="alta"] {
+  background: var(--violeta-900);
+  color: var(--blanco);
+  border-color: var(--violeta-700);
+}
+
+.chip-territorio-nombre {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  flex: 1;
+  line-height: var(--leading-tight);
+}
+
+.chip-territorio-conteo {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Leyenda de colores */
+.consolidado-leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: center;
+  padding: var(--space-4);
+  margin-top: var(--space-5);
+  background: var(--blanco);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.consolidado-leyenda-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--gris-700);
+}
+
+.consolidado-leyenda-color {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-sm);
+}
+
+/* ============================================================
+   VISTA MES: CALENDARIO POR TERRITORIO (con filtro)
+   ============================================================ */
+
+/* Grid tipo Google Calendar — solo visible en desktop */
+.calendario-mes {
+  background: var(--blanco);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.calendario-mes-dias-header {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--violeta-900);
+  color: var(--blanco);
+}
+
+.calendario-mes-dia-nombre {
+  padding: var(--space-3);
+  text-align: center;
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.calendario-mes-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  background: var(--gris-200);
+  gap: 1px;
+}
+
+.calendario-mes-celda {
+  background: var(--blanco);
+  min-height: 90px;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+}
+
+.calendario-mes-celda--fuera {
+  background: var(--gris-100);
+  opacity: 0.5;
+}
+
+.calendario-mes-celda--hoy {
+  background: var(--violeta-50);
+  box-shadow: inset 0 0 0 2px var(--coral-cuidarte);
+}
+
+.calendario-mes-dia-numero {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--violeta-900);
+  margin-bottom: 2px;
+}
+
+.calendario-mes-celda--hoy .calendario-mes-dia-numero {
+  color: var(--coral-cuidarte);
+  font-weight: var(--font-bold);
+}
+
+.calendario-mes-evento {
+  font-size: var(--text-xs);
+  padding: 2px var(--space-1);
+  background: var(--violeta-200);
+  color: var(--violeta-900);
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+  font-weight: var(--font-medium);
+}
+
+.calendario-mes-evento--cancelado {
+  background: var(--rojo-100);
+  color: var(--rojo-700);
+  text-decoration: line-through;
+}
+
+.calendario-mes-evento--ajustado {
+  background: var(--ambar-100);
+  color: var(--ambar-700);
+}
+
+.calendario-mes-evento-mas {
+  font-size: var(--text-xs);
+  color: var(--gris-700);
+  font-style: italic;
+  padding: 1px var(--space-1);
+}
+
+/* Versión mobile del calendario: lista por día (nativamente mejor) */
+.calendario-mes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Mostrar grid solo en desktop, lista solo en mobile */
+.calendario-mes { display: none; }
+.calendario-mes-lista { display: flex; }
+
+@media (min-width: 768px) {
+  .calendario-mes { display: block; }
+  .calendario-mes-lista { display: none; }
+}
+
 /* Chip de territorio dentro de tarjeta de vista semanal */
 .actividad-chip-territorio {
   display: inline-flex;
@@ -1443,6 +1751,11 @@ a:focus-visible {
 
   .dia-semana-nombre-dia {
     font-size: var(--text-xl);
+  }
+
+  /* Más columnas de territorios en desktop */
+  .territorios-grid {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   }
 }
 
