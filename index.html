@@ -23,7 +23,7 @@
   <!-- Estilos propios. El ?v= se incrementa en cada despliegue para romper
        cache del navegador — si no, los usuarios ven versiones viejas aunque
        GitHub Pages ya tenga la nueva. -->
-  <link rel="stylesheet" href="styles.css?v=20261112d">
+  <link rel="stylesheet" href="styles.css?v=20261112e">
 </head>
 
 <body>
@@ -311,6 +311,23 @@
       <span id="resultados-cantidad"></span>
     </div>
 
+    <!-- Botón de descarga PDF: solo visible cuando hay actividades para descargar -->
+    <div id="pdf-acciones" class="pdf-acciones" hidden>
+      <button id="btn-descargar-pdf"
+              type="button"
+              class="btn btn--primario btn--descargar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span>Descargar en PDF</span>
+      </button>
+      <p class="pdf-acciones-ayuda">
+        Se descarga lo que estás viendo con los filtros aplicados. Útil para imprimir o compartir.
+      </p>
+    </div>
+
   </main>
 
   <!-- ============================================================ -->
@@ -331,6 +348,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
   <!-- Lógica de la app (?v= rompe cache; ver comentario arriba) -->
-  <script src="app.js?v=20261112d"></script>
+  <script src="app.js?v=20261112e"></script>
 </body>
 </html>

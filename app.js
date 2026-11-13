@@ -84,6 +84,12 @@
   // Clave de localStorage para recordar si el usuario cerró la guía de filtro
   const GUIA_CERRADA_KEY = 'agenda-cuidarte:guia-filtro-cerrada';
 
+  // URLs de las librerías para generar PDF. Se cargan solo cuando el usuario
+  // hace clic en "Descargar PDF" (lazy load) para no inflar la carga inicial.
+  const PDF_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+  const PDF_TABLE_URL = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';
+  let _pdfLibsCargadas = false;
+
   // ============================================================
   // 3. HELPERS DE FECHAS Y FORMATO
   // ============================================================
@@ -613,6 +619,7 @@
     const $vacio = document.getElementById('estado-vacio');
     const $lista = document.getElementById('lista-actividades');
     const $resultados = document.getElementById('resultados-info');
+    const $pdfBtn = document.getElementById('pdf-acciones');
 
     // Resetear visibilidad
     $cargando.hidden = true;
@@ -620,6 +627,7 @@
     $vacio.hidden = true;
     $lista.hidden = true;
     $resultados.hidden = true;
+    $pdfBtn.hidden = true;
 
     if (state.cargando) {
       $cargando.hidden = false;
@@ -643,6 +651,8 @@
       document.getElementById('resultados-cantidad').textContent =
         filtradas.length + (filtradas.length === 1 ? ' actividad en esta semana' : ' actividades en esta semana') +
         (state.filtroComuna || state.filtroBusqueda ? ' con los filtros aplicados' : '');
+      // Mostrar PDF solo si hay al menos una actividad (sino no tiene sentido descargar)
+      if (filtradas.length > 0) $pdfBtn.hidden = false;
       return;
     }
 
@@ -661,6 +671,8 @@
     document.getElementById('resultados-cantidad').textContent =
       filtradas.length + (filtradas.length === 1 ? ' actividad' : ' actividades') +
       (state.filtroComuna || state.filtroBusqueda ? ' con los filtros aplicados' : '');
+
+    $pdfBtn.hidden = false;
   }
 
   /**
@@ -1206,6 +1218,11 @@
       anunciar('Volviendo a esta semana');
     });
 
+    // Botón de descarga PDF
+    document.getElementById('btn-descargar-pdf').addEventListener('click', () => {
+      generarPdf();
+    });
+
     // Chip de guía: cerrarlo guarda la decisión en localStorage para que no vuelva
     document.getElementById('btn-cerrar-guia').addEventListener('click', () => {
       try {
@@ -1218,6 +1235,407 @@
 
     // Actualizar timestamp cada minuto
     setInterval(actualizarTimestamp, 60000);
+  }
+
+  // ============================================================
+  // 9. GENERACIÓN DE PDF (lazy load de jsPDF + autoTable)
+  // ============================================================
+
+  /**
+   * Carga un script externo. Se usa para cargar jsPDF y autoTable solo cuando
+   * el usuario toca "Descargar PDF" (lazy load — ahorra ~130KB en la carga inicial).
+   */
+  function cargarScript(url) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error('No se pudo cargar: ' + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  /**
+   * Carga las librerías de PDF una sola vez por sesión.
+   */
+  async function cargarLibreriasPdf() {
+    if (_pdfLibsCargadas) return;
+    await cargarScript(PDF_LIB_URL);
+    await cargarScript(PDF_TABLE_URL);
+    _pdfLibsCargadas = true;
+  }
+
+  /**
+   * Nombre del archivo PDF basado en vista y filtros.
+   * Ejemplo: "agenda-cuidarte-hoy-12-nov-2026.pdf"
+   */
+  function nombrePdf() {
+    const d = new Date();
+    const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+                   'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    let base = 'agenda-cuidarte';
+    if (state.vistaActiva === 'hoy') {
+      base += '-hoy-' + d.getDate() + '-' + meses[d.getMonth()] + '-' + d.getFullYear();
+    } else if (state.vistaActiva === 'semana') {
+      const sem = obtenerSemana(state.semanaOffset);
+      base += '-semana-' + sem.inicio.getDate() + '-al-' + sem.fin.getDate() +
+              '-' + meses[sem.fin.getMonth()] + '-' + sem.fin.getFullYear();
+    }
+    if (state.filtroComuna) {
+      base += '-' + state.filtroComuna.toLowerCase().replace(/\s+/g, '-');
+    }
+    return base + '.pdf';
+  }
+
+  /**
+   * Convierte un color hex "#322A3C" al array [R, G, B] que usa jsPDF.
+   */
+  function hex2rgb(hex) {
+    const h = hex.replace('#', '');
+    return [
+      parseInt(h.substr(0, 2), 16),
+      parseInt(h.substr(2, 2), 16),
+      parseInt(h.substr(4, 2), 16)
+    ];
+  }
+
+  /**
+   * Devuelve el contexto que identifica el PDF: título principal + rango.
+   */
+  function contextoPdf() {
+    if (state.vistaActiva === 'hoy') {
+      return {
+        titulo: 'Agenda de hoy',
+        subtitulo: cap_(formatearFechaLarga(hoy()))
+      };
+    }
+    const sem = obtenerSemana(state.semanaOffset);
+    const titulo = 'Agenda semanal';
+    let sub;
+    if (sem.inicio.getMonth() === sem.fin.getMonth()) {
+      sub = sem.inicio.getDate() + ' al ' + sem.fin.getDate() + ' de ' + mesEs_(sem.fin) + ' de ' + sem.fin.getFullYear();
+    } else {
+      sub = sem.inicio.getDate() + ' de ' + mesEs_(sem.inicio) + ' al ' +
+            sem.fin.getDate() + ' de ' + mesEs_(sem.fin) + ' de ' + sem.fin.getFullYear();
+    }
+    return { titulo: titulo, subtitulo: cap_(sub) };
+  }
+
+  /**
+   * Agrupa las actividades filtradas por día. Para vista "hoy" solo hay un día;
+   * para vista "semana" hay 7 (incluyendo los vacíos).
+   */
+  function agruparPorDiaParaPdf(filtradas) {
+    if (state.vistaActiva === 'semana') {
+      const sem = obtenerSemana(state.semanaOffset);
+      return sem.dias.map(d => ({
+        fecha: d,
+        actividades: filtradas.filter(a => a.fechaKey === fechaKey(d))
+      }));
+    }
+    // Vista hoy: un solo grupo con la fecha de hoy
+    const h = hoy();
+    return [{ fecha: h, actividades: filtradas }];
+  }
+
+  /**
+   * Genera el PDF a partir del filtro activo y lo descarga.
+   * Formato: header institucional + una sección por día + tabla de actividades.
+   *
+   * Detalle importante: en el PDF se muestran TODOS los datos de cada actividad
+   * (espejo, nota, etc.), no en dropdowns. El PDF no es interactivo.
+   */
+  async function generarPdf() {
+    const $btn = document.getElementById('btn-descargar-pdf');
+    $btn.setAttribute('aria-busy', 'true');
+    anunciar('Generando PDF, espera un momento');
+
+    try {
+      await cargarLibreriasPdf();
+
+      const filtradas = filtrarActividades();
+      if (filtradas.length === 0) {
+        throw new Error('No hay actividades para descargar con los filtros actuales.');
+      }
+
+      // jsPDF se expone en window.jspdf.jsPDF (versión UMD)
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+      // Colores de la paleta institucional
+      const COLOR_VIOLETA = hex2rgb('#322A3C');
+      const COLOR_VIOLETA_CLARO = hex2rgb('#CECBF6');
+      const COLOR_ROSA = hex2rgb('#CC6683');
+      const COLOR_CORAL = hex2rgb('#ED7170');
+      const COLOR_AMBAR_BG = hex2rgb('#FAEEDA');
+      const COLOR_AMBAR_TX = hex2rgb('#633806');
+      const COLOR_ROJO = hex2rgb('#791F1F');
+      const COLOR_GRIS_BG = hex2rgb('#F1EFE8');
+      const COLOR_GRIS_TX = hex2rgb('#444441');
+      const COLOR_TINTA = hex2rgb('#1A1A1A');
+
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const M = 40; // Margen
+
+      // ===== HEADER =====
+      doc.setFillColor.apply(doc, COLOR_VIOLETA);
+      doc.rect(0, 0, W, 90, 'F');
+
+      const ctx = contextoPdf();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(22);
+      doc.setTextColor(255, 255, 255);
+      doc.text(ctx.titulo, M, 40);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(12);
+      doc.setTextColor.apply(doc, COLOR_VIOLETA_CLARO);
+      doc.text(ctx.subtitulo, M, 60);
+
+      doc.setFontSize(10);
+      doc.text('Proyecto Cuidarte · Subsecretaría de Equidad de Género · Alcaldía de Cali', M, 78);
+
+      // Chips de filtros aplicados debajo del header
+      let yFiltros = 110;
+      if (state.filtroComuna || state.filtroBusqueda) {
+        doc.setFillColor.apply(doc, COLOR_AMBAR_BG);
+        doc.rect(0, 90, W, 30, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.setTextColor.apply(doc, COLOR_AMBAR_TX);
+        let texto = 'Filtros activos: ';
+        if (state.filtroComuna) texto += state.filtroComuna;
+        if (state.filtroComuna && state.filtroBusqueda) texto += ' · ';
+        if (state.filtroBusqueda) texto += 'búsqueda "' + state.filtroBusqueda + '"';
+        doc.text(texto, M, 108);
+        yFiltros = 140;
+      }
+
+      // ===== CONTENIDO: una sección por día =====
+      const grupos = agruparPorDiaParaPdf(filtradas);
+      let y = yFiltros + 10;
+
+      grupos.forEach((grupo, idxGrupo) => {
+        // Si no hay espacio para el header del día + al menos una actividad, salto de página
+        if (y > H - 120) {
+          doc.addPage();
+          y = M + 10;
+        }
+
+        // Encabezado del día
+        doc.setFillColor.apply(doc, COLOR_VIOLETA);
+        doc.rect(M, y, W - 2 * M, 28, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(13);
+        doc.setTextColor(255, 255, 255);
+        const nombreDia = cap_(diaEs_(grupo.fecha, false)) + ' ' + grupo.fecha.getDate() +
+                          ' de ' + mesEs_(grupo.fecha);
+        doc.text(nombreDia, M + 10, y + 18);
+
+        // Contador a la derecha
+        const contador = grupo.actividades.length === 0 ? 'Sin actividades' :
+                        grupo.actividades.length === 1 ? '1 actividad' :
+                        grupo.actividades.length + ' actividades';
+        const contW = doc.getStringUnitWidth(contador) * 10;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(contador, W - M - 10 - contW, y + 18);
+
+        y += 36;
+
+        // Actividades del día (si hay)
+        if (grupo.actividades.length === 0) {
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(10);
+          doc.setTextColor.apply(doc, COLOR_GRIS_TX);
+          doc.text('Sin actividades programadas para este día', M + 10, y + 5);
+          y += 24;
+        } else {
+          grupo.actividades.forEach(a => {
+            y = pintarActividadPdf(doc, a, y, W, H, M, {
+              violeta: COLOR_VIOLETA,
+              rosa: COLOR_ROSA,
+              coral: COLOR_CORAL,
+              ambarBg: COLOR_AMBAR_BG,
+              ambarTx: COLOR_AMBAR_TX,
+              rojo: COLOR_ROJO,
+              grisBg: COLOR_GRIS_BG,
+              grisTx: COLOR_GRIS_TX,
+              tinta: COLOR_TINTA
+            });
+            y += 8;
+          });
+        }
+
+        y += 12;
+      });
+
+      // ===== FOOTER en cada página =====
+      const totalPaginas = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= totalPaginas; i++) {
+        doc.setPage(i);
+        doc.setFillColor.apply(doc, COLOR_GRIS_BG);
+        doc.rect(0, H - 30, W, 30, 'F');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor.apply(doc, COLOR_GRIS_TX);
+        const gen = 'Generado el ' + formatearFechaLarga(new Date()) + ' a las ' +
+                    new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+        doc.text(gen, M, H - 12);
+        const pagTxt = 'Página ' + i + ' de ' + totalPaginas;
+        const pagW = doc.getStringUnitWidth(pagTxt) * 8;
+        doc.text(pagTxt, W - M - pagW, H - 12);
+      }
+
+      doc.save(nombrePdf());
+      anunciar('PDF descargado correctamente');
+    } catch (err) {
+      console.error('Error al generar PDF:', err);
+      alert('No pudimos generar el PDF: ' + err.message + '\n\nSi el problema persiste, revisa tu conexión a internet (la librería se descarga la primera vez).');
+      anunciar('Error al generar PDF: ' + err.message);
+    } finally {
+      $btn.removeAttribute('aria-busy');
+    }
+  }
+
+  /**
+   * Pinta una actividad individual en el PDF. Devuelve la nueva Y.
+   */
+  function pintarActividadPdf(doc, a, y, W, H, M, colores) {
+    // Salto de página si no cabe
+    if (y > H - 100) {
+      doc.addPage();
+      y = M + 10;
+    }
+
+    const anchoTotal = W - 2 * M;
+    const alturaBase = 60; // altura mínima estimada
+
+    // Chip de territorio (siempre visible en PDF para dar contexto)
+    doc.setFillColor(230, 226, 240);
+    doc.roundedRect(M + 4, y, 100, 14, 3, 3, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor.apply(doc, colores.violeta);
+    doc.text(a.territorio, M + 10, y + 10);
+
+    y += 20;
+
+    // Hora
+    const hora = a.horaInicio + (a.horaFin ? ' – ' + a.horaFin : '');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor.apply(doc, colores.violeta);
+    doc.text(hora || 'Sin hora', M + 4, y + 2);
+
+    y += 14;
+
+    // Título de la actividad
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    if (a.estado === 'Cancelada') {
+      doc.setTextColor.apply(doc, colores.rojo);
+    } else {
+      doc.setTextColor.apply(doc, colores.tinta);
+    }
+    const tituloLineas = doc.splitTextToSize(a.actividad, anchoTotal - 10);
+    doc.text(tituloLineas, M + 4, y + 2);
+    y += tituloLineas.length * 14;
+
+    // Metadata: lugar y responsable
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor.apply(doc, colores.grisTx);
+    if (a.lugar) {
+      const l = doc.splitTextToSize('Lugar: ' + a.lugar, anchoTotal - 10);
+      doc.text(l, M + 4, y + 10);
+      y += l.length * 12;
+    }
+    if (a.responsable) {
+      const r = doc.splitTextToSize('Responsable: ' + a.responsable, anchoTotal - 10);
+      doc.text(r, M + 4, y + 10);
+      y += r.length * 12;
+    }
+
+    // Badge de estado (si no es Programada)
+    if (a.estado === 'Cancelada') {
+      doc.setFillColor.apply(doc, colores.rojo);
+      doc.roundedRect(M + 4, y + 6, 100, 16, 3, 3, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(255, 255, 255);
+      doc.text('CANCELADA', M + 12, y + 17);
+      y += 24;
+    } else if (a.estado === 'Ajustada') {
+      doc.setFillColor.apply(doc, colores.ambarBg);
+      doc.roundedRect(M + 4, y + 6, 120, 16, 3, 3, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, colores.ambarTx);
+      doc.text('CON AJUSTES', M + 12, y + 17);
+      y += 24;
+    }
+
+    // Nota de cambio: expandida (no colapsada como en la web)
+    if (a.nota) {
+      doc.setFillColor.apply(doc, colores.ambarBg);
+      const notaLineas = doc.splitTextToSize('Nota: ' + a.nota, anchoTotal - 20);
+      const altoNota = notaLineas.length * 12 + 10;
+      doc.rect(M + 4, y + 6, anchoTotal - 8, altoNota, 'F');
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, colores.ambarTx);
+      doc.text(notaLineas, M + 10, y + 16);
+      y += altoNota + 4;
+    }
+
+    // Actividad espejo: expandida (no colapsada como en la web)
+    if (a.espejoActividad) {
+      doc.setDrawColor.apply(doc, colores.coral);
+      doc.setLineWidth(1.5);
+      doc.line(M + 4, y + 10, M + anchoTotal, y + 10);
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, colores.coral);
+      doc.text('ACTIVIDAD ESPEJO · Para personas que requieren cuidado', M + 4, y + 22);
+      y += 28;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor.apply(doc, colores.tinta);
+      const esT = doc.splitTextToSize(a.espejoActividad, anchoTotal - 10);
+      doc.text(esT, M + 4, y + 6);
+      y += esT.length * 12 + 2;
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor.apply(doc, colores.grisTx);
+      if (a.espejoHoraInicio) {
+        doc.text('Hora: ' + a.espejoHoraInicio + (a.espejoHoraFin ? ' – ' + a.espejoHoraFin : ''), M + 4, y + 6);
+        y += 12;
+      }
+      if (a.espejoLugar) {
+        const l = doc.splitTextToSize('Lugar: ' + a.espejoLugar, anchoTotal - 10);
+        doc.text(l, M + 4, y + 6);
+        y += l.length * 12;
+      }
+      if (a.espejoResponsable) {
+        const r = doc.splitTextToSize('Responsable: ' + a.espejoResponsable, anchoTotal - 10);
+        doc.text(r, M + 4, y + 6);
+        y += r.length * 12;
+      }
+    }
+
+    // Línea separadora al final
+    doc.setDrawColor(220, 218, 210);
+    doc.setLineWidth(0.5);
+    doc.line(M + 4, y + 10, M + anchoTotal, y + 10);
+    y += 14;
+
+    return y;
   }
 
   // ============================================================
