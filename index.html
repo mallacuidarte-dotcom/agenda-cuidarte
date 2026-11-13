@@ -20,8 +20,10 @@
   <!-- Favicon desde el logo de Cuidarte -->
   <link rel="icon" type="image/svg+xml" href="assets/logos/cuidarte-color.svg">
 
-  <!-- Estilos propios -->
-  <link rel="stylesheet" href="styles.css">
+  <!-- Estilos propios. El ?v= se incrementa en cada despliegue para romper
+       cache del navegador — si no, los usuarios ven versiones viejas aunque
+       GitHub Pages ya tenga la nueva. -->
+  <link rel="stylesheet" href="styles.css?v=20261112c">
 </head>
 
 <body>
@@ -328,7 +330,7 @@
   <!-- PapaParse: parser de CSV robusto (45KB gzipped) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
-  <!-- Lógica de la app -->
-  <script src="app.js"></script>
+  <!-- Lógica de la app (?v= rompe cache; ver comentario arriba) -->
+  <script src="app.js?v=20261112c"></script>
 </body>
 </html>
