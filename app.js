@@ -157,9 +157,13 @@
   }
 
   /**
-   * Devuelve el mes actual con sus semanas lunes-domingo que lo cubren.
-   * Incluye días del mes anterior/siguiente que caen dentro de esas semanas,
-   * marcados con esDelMes=false para distinguirlos visualmente.
+   * Devuelve el mes actual con sus semanas como bloques de 7 días a partir
+   * del día 1. Así "Semana 1" es siempre del 1 al 7, "Semana 2" del 8 al 14,
+   * etc. La última puede ser parcial (menos de 7 días).
+   *
+   * No usamos lun-dom puro porque en un mes de 30 días que empieza en
+   * domingo (como noviembre 2026) daría 6 semanas con 2 de ellas de solo
+   * 1 día — confuso para las supervisoras que esperan "4 o 5 semanas".
    *
    * @return {{inicio, fin, nombreMes, anio, semanas, totalDiasMes}}
    */
@@ -168,39 +172,31 @@
     const anio = ahora.getFullYear();
     const mes = ahora.getMonth();
     const primerDia = new Date(anio, mes, 1, 12, 0, 0);
+    primerDia.setHours(0, 0, 0, 0);
     const ultimoDia = new Date(anio, mes + 1, 0, 23, 59, 59);
+    const totalDiasMes = new Date(anio, mes + 1, 0).getDate();
 
-    // Semana lun-dom que contiene el primer día del mes
-    const dow1 = primerDia.getDay();
-    const diasAlLunes1 = dow1 === 0 ? -6 : 1 - dow1;
-    const inicioGrid = new Date(primerDia);
-    inicioGrid.setDate(primerDia.getDate() + diasAlLunes1);
-    inicioGrid.setHours(0, 0, 0, 0);
-
-    // Partir en semanas de 7 días hasta pasar el último día del mes
+    // Dividir el mes en bloques de 7 días a partir del día 1
     const semanas = [];
-    let cursor = new Date(inicioGrid);
+    let dia = 1;
     let semanaIndice = 1;
-    while (cursor <= ultimoDia) {
+    while (dia <= totalDiasMes) {
       const dias = [];
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(cursor);
-        d.setDate(cursor.getDate() + i);
-        d.setHours(12, 0, 0, 0);
-        dias.push({
-          fecha: d,
-          esDelMes: d.getMonth() === mes
-        });
+      for (let i = 0; i < 7 && dia <= totalDiasMes; i++, dia++) {
+        const d = new Date(anio, mes, dia, 12, 0, 0);
+        dias.push({ fecha: d, esDelMes: true });
       }
+      // Inicio a medianoche, fin al final del día — para comparaciones de rango
+      const inicioBloque = new Date(dias[0].fecha);
+      inicioBloque.setHours(0, 0, 0, 0);
+      const finBloque = new Date(dias[dias.length - 1].fecha);
+      finBloque.setHours(23, 59, 59, 999);
       semanas.push({
         numero: semanaIndice++,
-        inicio: new Date(cursor),
-        fin: dias[6].fecha,
+        inicio: inicioBloque,
+        fin: finBloque,
         dias: dias
       });
-      cursor = new Date(cursor);
-      cursor.setDate(cursor.getDate() + 7);
-      cursor.setHours(0, 0, 0, 0);
     }
 
     return {
@@ -209,8 +205,55 @@
       nombreMes: mesEs_(primerDia),
       anio: anio,
       semanas: semanas,
-      totalDiasMes: new Date(anio, mes + 1, 0).getDate()
+      totalDiasMes: totalDiasMes
     };
+  }
+
+  /**
+   * Para la vista CALENDARIO (estilo Google Calendar) necesitamos la grilla
+   * lunes-domingo con días del mes anterior/siguiente como relleno. Esta
+   * función devuelve esa grilla separada — el consolidado por bloques y la
+   * grilla visual del calendario son dos cosas distintas.
+   */
+  function obtenerGridCalendario() {
+    const ahora = new Date();
+    const anio = ahora.getFullYear();
+    const mes = ahora.getMonth();
+    const primerDia = new Date(anio, mes, 1, 12, 0, 0);
+    const ultimoDia = new Date(anio, mes + 1, 0, 12, 0, 0);
+
+    // Retroceder al lunes de la semana del día 1
+    const dow1 = primerDia.getDay();
+    const diasAlLunes1 = dow1 === 0 ? -6 : 1 - dow1;
+    const inicioGrid = new Date(primerDia);
+    inicioGrid.setDate(primerDia.getDate() + diasAlLunes1);
+    inicioGrid.setHours(0, 0, 0, 0);
+
+    // Avanzar al domingo después del último día
+    const dow2 = ultimoDia.getDay();
+    const diasAlDomingo = dow2 === 0 ? 0 : 7 - dow2;
+    const finGrid = new Date(ultimoDia);
+    finGrid.setDate(ultimoDia.getDate() + diasAlDomingo);
+    finGrid.setHours(23, 59, 59, 999);
+
+    // Construir semanas lun-dom
+    const semanas = [];
+    let cursor = new Date(inicioGrid);
+    while (cursor <= finGrid) {
+      const dias = [];
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(cursor);
+        d.setDate(cursor.getDate() + i);
+        d.setHours(12, 0, 0, 0);
+        dias.push({ fecha: d, esDelMes: d.getMonth() === mes });
+      }
+      semanas.push({ dias });
+      cursor = new Date(cursor);
+      cursor.setDate(cursor.getDate() + 7);
+      cursor.setHours(0, 0, 0, 0);
+    }
+
+    return { semanas };
   }
 
   /**
@@ -965,7 +1008,7 @@
 
     // Resumen general del mes
     const total = contarActividadesDelMes();
-    const semanaActualInicio = obtenerSemana(0).inicio.getTime();
+    const hoyDate = hoy();
 
     const resumen =
       '<div class="mes-resumen">' +
@@ -988,8 +1031,17 @@
 
     // Cards por semana
     const cardsSemanas = mes.semanas.map(sem => {
-      const esActual = sem.inicio.getTime() === semanaActualInicio;
+      // "Actual" = el bloque donde cae hoy
+      const esActual = hoyDate >= sem.inicio && hoyDate <= sem.fin;
       let totalSemana = 0;
+
+      // Para navegación: calcular el lunes de la semana lun-dom que contiene
+      // el inicio de este bloque (porque la vista semana trabaja con lun-dom).
+      const dow = sem.inicio.getDay();
+      const diasAlLunes = dow === 0 ? -6 : 1 - dow;
+      const lunesSemana = new Date(sem.inicio);
+      lunesSemana.setDate(sem.inicio.getDate() + diasAlLunes);
+      lunesSemana.setHours(0, 0, 0, 0);
 
       const chipsHtml = territorios.map(terr => {
         const n = contarActividadesEnSemana(terr, sem);
@@ -999,7 +1051,7 @@
           '<button class="chip-territorio" type="button" ' +
                   'data-densidad="' + densidad + '" ' +
                   'data-territorio="' + escapar(terr) + '" ' +
-                  'data-semana-inicio="' + sem.inicio.getTime() + '" ' +
+                  'data-semana-inicio="' + lunesSemana.getTime() + '" ' +
                   'aria-label="' + escapar(terr) + ': ' + n +
                   (n === 1 ? ' actividad' : ' actividades') + ' en semana ' + sem.numero + '. Toca para ver.">' +
             '<span class="chip-territorio-nombre">' + escapar(terr) + '</span>' +
@@ -1100,7 +1152,9 @@
       '<div class="calendario-mes-dia-nombre">' + d + '</div>'
     ).join('');
 
-    const celdasGrid = mes.semanas.flatMap(sem =>
+    // Usar la grilla con relleno (días fuera del mes aparecen difuminados)
+    const grid = obtenerGridCalendario();
+    const celdasGrid = grid.semanas.flatMap(sem =>
       sem.dias.map(dia => {
         const diaKey = fechaKey(dia.fecha);
         const esHoy = diaKey === hoyKey;
@@ -1132,7 +1186,7 @@
       })
     ).join('');
 
-    const grid =
+    const gridHtml =
       '<div class="calendario-mes">' +
         '<div class="calendario-mes-dias-header">' + headerGrid + '</div>' +
         '<div class="calendario-mes-grid">' + celdasGrid + '</div>' +
@@ -1184,7 +1238,7 @@
       }).join('') +
     '</div>';
 
-    return grid + lista;
+    return gridHtml + lista;
   }
 
   /**
