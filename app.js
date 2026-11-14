@@ -1528,6 +1528,27 @@
   }
 
   /**
+   * Registra un evento en GoatCounter (si está activado).
+   * Falla silenciosa si GoatCounter no está cargado — nada se rompe.
+   *
+   * Usar con moderación: solo eventos que valga la pena medir.
+   * NO trackear datos sensibles (texto libre de búsqueda, nombres propios, etc.)
+   */
+  function trackear(evento, titulo) {
+    try {
+      if (window.goatcounter && window.goatcounter.count) {
+        window.goatcounter.count({
+          path: 'evento/' + evento,
+          title: titulo || evento,
+          event: true
+        });
+      }
+    } catch (e) {
+      // Ignorar; analíticas nunca deben romper la app
+    }
+  }
+
+  /**
    * Anuncia un mensaje al lector de pantalla (accesibilidad).
    */
   function anunciar(mensaje) {
@@ -1563,6 +1584,7 @@
     const $btnRefresh = document.getElementById('btn-actualizar');
     $btnRefresh.addEventListener('click', () => {
       cargarDatos();
+      trackear('actualizar-manual', 'Usuario pidió actualizar los datos');
     });
 
     // Filtro: territorio
@@ -1573,6 +1595,12 @@
       anunciar(state.filtroComuna
         ? 'Filtro por territorio: ' + state.filtroComuna
         : 'Mostrando todos los territorios');
+      // Trackear qué territorios se consultan más (útil para saber dónde
+      // hay más interés / qué territorios tienen más tráfico de lideresas)
+      if (state.filtroComuna) {
+        trackear('filtro-territorio/' + slug(state.filtroComuna),
+                 'Filtró por ' + state.filtroComuna);
+      }
     });
 
     // Toggle del buscador: la lupa lo abre, limpiar lo cierra
@@ -1642,6 +1670,7 @@
           t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
         });
         anunciar('Vista: ' + tab.textContent.trim());
+        trackear('vista-' + vista, 'Cambió a vista ' + vista);
         render();
       });
     });
@@ -1938,6 +1967,7 @@
 
       doc.save(nombrePdf());
       anunciar('PDF descargado correctamente');
+      trackear('pdf-descargado', 'PDF descargado (vista: ' + state.vistaActiva + ')');
     } catch (err) {
       console.error('Error al generar PDF:', err);
       alert('No pudimos generar el PDF: ' + err.message + '\n\nSi el problema persiste, revisa tu conexión a internet (la librería se descarga la primera vez).');
